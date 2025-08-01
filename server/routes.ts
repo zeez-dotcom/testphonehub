@@ -137,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/uploads', express.static(uploadDir));
 
   // File upload route
-  app.post("/api/upload", requireAuth, upload.single('file'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/upload", requireAuth, upload.single('file'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -160,7 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Authentication routes
-  app.post("/api/auth/register", async (req: AuthenticatedRequest, res) => {
+  app.post("/api/auth/register", async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const userData = insertUserSchema.parse(req.body);
       const existingUser = await storage.getUserByEmail(userData.email);
@@ -190,7 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", async (req: AuthenticatedRequest, res) => {
+  app.post("/api/auth/login", async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { email, password } = req.body;
 
@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/google/callback",
     passport.authenticate("google", { failureRedirect: "/auth?error=google_failed" }),
-    async (req, res) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const user = req.user as any;
         const token = jwt.sign(
@@ -288,7 +288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/apple/callback",
     passport.authenticate("apple", { failureRedirect: "/auth?error=apple_failed" }),
-    async (req, res) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const user = req.user as any;
         const token = jwt.sign(
@@ -311,7 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ message: "Logout successful" });
   });
 
-  app.get("/api/auth/user", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/auth/user", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Not authenticated" });
@@ -329,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product routes (Only show approved products in marketplace)
-  app.get("/api/products", async (req, res) => {
+  app.get("/api/products", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const filters = {
         category: req.query.category as string,
@@ -350,7 +350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/products/seller", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/products/seller", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       // Get products for the current seller
       const seller = await storage.getSellerByUserId(req.user!.userId);
@@ -371,7 +371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get seller notifications
-  app.get("/api/seller/notifications", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/seller/notifications", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.getSellerByUserId(req.user!.userId);
       if (!seller) {
@@ -387,7 +387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mark seller notification as read
-  app.put("/api/seller/notifications/:id/read", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/seller/notifications/:id/read", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       await storage.markNotificationRead(req.params.id);
       res.json({ success: true });
@@ -397,7 +397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/products", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/products", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       // Check if user is a seller (approved sellers can add products that go to pending)
       const user = req.user!;
@@ -441,7 +441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/products/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/products/:id", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const product = await storage.getProduct(req.params.id);
       if (!product) {
@@ -462,7 +462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/products/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/products/:id", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const product = await storage.getProduct(req.params.id);
       if (!product) {
@@ -483,7 +483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Cart routes
-  app.get("/api/cart", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/cart", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const cartItems = await storage.getCartItems(req.user!.userId);
       res.json(cartItems);
@@ -493,7 +493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/cart", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/cart", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const cartData = insertCartSchema.parse({
         ...req.body,
@@ -508,7 +508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/cart/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/cart/:id", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { quantity } = req.body;
       const cartItem = await storage.updateCartItem(req.params.id, quantity);
@@ -519,7 +519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/cart/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/cart/:id", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       await storage.removeFromCart(req.params.id);
       res.json({ message: "Item removed from cart" });
@@ -530,7 +530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Order routes
-  app.get("/api/orders", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/orders", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const filters: any = {};
       
@@ -553,7 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get seller orders with enhanced details
-  app.get("/api/orders/seller", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/orders/seller", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.getSellerByUserId(req.user!.userId);
       if (!seller) {
@@ -568,7 +568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/orders", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/orders", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       // Get cart items to check stock
       const cartItems = await storage.getCartItems(req.user!.userId);
@@ -630,7 +630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/orders/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/orders/:id", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const order = await storage.getOrder(req.params.id);
       if (!order) {
@@ -657,7 +657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payment routes
-  app.post("/api/payments", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/payments", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const paymentData = insertPaymentSchema.parse(req.body);
       
@@ -684,7 +684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Receipt generation route
-  app.get("/api/orders/:orderId/receipt", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/orders/:orderId/receipt", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const orderId = req.params.orderId;
       const order = await storage.getOrder(orderId);
@@ -748,7 +748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Seller routes
-  app.get("/api/sellers/pending", requireRole("admin"), async (req, res) => {
+  app.get("/api/sellers/pending", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const pendingSellers = await storage.getPendingSellers();
       res.json(pendingSellers);
@@ -758,7 +758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/sellers/approved", requireRole("admin"), async (req, res) => {
+  app.get("/api/sellers/approved", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const approvedSellers = await storage.getApprovedSellers();
       res.json(approvedSellers);
@@ -768,7 +768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/sellers", requireRole("admin"), async (req, res) => {
+  app.get("/api/sellers", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sellers = await storage.getAllSellers();
       res.json(sellers);
@@ -778,7 +778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/sellers/:id/approve", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+  app.put("/api/sellers/:id/approve", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.approveSeller(req.params.id, req.user!.userId);
       if (!seller) {
@@ -791,7 +791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/sellers/:id/reject", requireRole("admin"), async (req, res) => {
+  app.put("/api/sellers/:id/reject", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       // For simplified implementation, we just return success
       const seller = await storage.getSeller(req.params.id);
@@ -806,7 +806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get seller profile route
-  app.get("/api/seller/profile", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/seller/profile", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.getSellerByUserId(req.user!.userId);
       if (!seller) {
@@ -820,7 +820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Seller document submission route
-  app.put("/api/seller/documents", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/seller/documents", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.getSellerByUserId(req.user!.userId);
       if (!seller) {
@@ -853,7 +853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin routes for document management
-  app.get("/api/admin/sellers/documents", requireRole("admin"), async (req, res) => {
+  app.get("/api/admin/sellers/documents", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sellers = await storage.getSellersWithDocuments();
       res.json(sellers);
@@ -863,7 +863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/sellers/:id/approve-documents", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+  app.put("/api/admin/sellers/:id/approve-documents", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const sellerId = req.params.id;
       const updatedSeller = await storage.updateSeller(sellerId, {
@@ -884,7 +884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/sellers/:id/reject-documents", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+  app.put("/api/admin/sellers/:id/reject-documents", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const sellerId = req.params.id;
       const { rejectionReason } = req.body;
@@ -907,7 +907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product approval routes (Admin only) - MUST come before /api/products/:id
-  app.get("/api/products/pending", requireRole("admin"), async (req, res) => {
+  app.get("/api/products/pending", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const products = await storage.getPendingProducts();
       res.json(products);
@@ -918,7 +918,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get detailed product with seller information - MUST come before generic :id route
-  app.get("/api/products/:id/details", async (req, res) => {
+  app.get("/api/products/:id/details", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const product = await storage.getProduct(req.params.id);
       if (!product) {
@@ -962,7 +962,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Individual product route - MUST come after specific routes like /pending and /details
-  app.get("/api/products/:id", async (req, res) => {
+  app.get("/api/products/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const product = await storage.getProduct(req.params.id);
       if (!product) {
@@ -975,7 +975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/products/:id/approve", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+  app.put("/api/products/:id/approve", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const product = await storage.approveProduct(req.params.id, req.user!.userId);
       
@@ -996,7 +996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/products/:id/reject", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+  app.put("/api/products/:id/reject", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { reason = "Product does not meet marketplace standards" } = req.body;
       const product = await storage.rejectProduct(req.params.id, reason);
@@ -1019,7 +1019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Notifications routes (Admin only)
-  app.get("/api/notifications", requireRole("admin"), async (req, res) => {
+  app.get("/api/notifications", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
       const notifications = await storage.getNotifications(limit);
@@ -1030,7 +1030,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/notifications/:id/read", requireRole("admin"), async (req, res) => {
+  app.put("/api/notifications/:id/read", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       await storage.markNotificationRead(req.params.id);
       res.json({ success: true });
@@ -1041,7 +1041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin settings routes
-  app.get("/api/admin/settings", requireRole("admin"), async (req, res) => {
+  app.get("/api/admin/settings", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const notificationEmail = await storage.getAdminSetting("notification_email");
       res.json({ 
@@ -1054,7 +1054,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/settings", requireRole("admin"), async (req, res) => {
+  app.put("/api/admin/settings", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (req.body.notification_email) {
         await storage.setAdminSetting(
@@ -1071,7 +1071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Individual seller details route (Admin only)
-  app.get("/api/sellers/:id", requireRole("admin"), async (req, res) => {
+  app.get("/api/sellers/:id", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.getSeller(req.params.id);
       if (!seller) {
@@ -1085,7 +1085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Seller stats route (Admin only)
-  app.get("/api/sellers/:id/stats", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+  app.get("/api/sellers/:id/stats", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const sellerId = req.params.id;
       const stats = await storage.getSellerAnalytics(sellerId);
@@ -1097,7 +1097,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Users management routes (Admin only)
-  app.get("/api/users", requireRole("admin"), async (req, res) => {
+  app.get("/api/users", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users);
@@ -1108,7 +1108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get customers only (Admin only)
-  app.get("/api/admin/customers", requireRole("admin"), async (req, res) => {
+  app.get("/api/admin/customers", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const customers = await storage.getCustomers();
       res.json(customers);
@@ -1119,7 +1119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get sellers only (Admin only)
-  app.get("/api/admin/sellers", requireRole("admin"), async (req, res) => {
+  app.get("/api/admin/sellers", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sellers = await storage.getAllSellers();
       res.json(sellers);
@@ -1129,8 +1129,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all payments (Admin only)
+  app.get("/api/admin/payments", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const payments = await storage.getAllPayments();
+      res.json(payments);
+    } catch (error) {
+      console.error("Get payments error:", error);
+      res.status(500).json({ message: "Failed to get payments" });
+    }
+  });
+
   // Get sellers with documents for admin review
-  app.get("/api/admin/sellers/documents", requireRole("admin"), async (req, res) => {
+  app.get("/api/admin/sellers/documents", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sellersWithDocuments = await storage.getSellersWithDocuments();
       res.json(sellersWithDocuments);
@@ -1141,7 +1152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Approve seller documents
-  app.put("/api/admin/sellers/:userId/approve-documents", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+  app.put("/api/admin/sellers/:userId/approve-documents", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.approveSeller(req.params.userId, req.user!.userId);
       if (!seller) {
@@ -1155,7 +1166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reject seller documents
-  app.put("/api/admin/sellers/:userId/reject-documents", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+  app.put("/api/admin/sellers/:userId/reject-documents", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { rejectionReason } = req.body;
       
@@ -1180,7 +1191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin upload document on behalf of seller
-  app.put("/api/admin/sellers/:userId/upload-document", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+  app.put("/api/admin/sellers/:userId/upload-document", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { field, fileUrl } = req.body;
       
@@ -1212,7 +1223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin edit seller details
-  app.put("/api/admin/sellers/:userId/edit-details", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+  app.put("/api/admin/sellers/:userId/edit-details", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { businessName, businessType, phoneNumber, whatsappNumber, businessAddress, shopLicenseNumber, ownerCivilId } = req.body;
       
@@ -1244,7 +1255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/users/:id/role", requireRole("admin"), async (req, res) => {
+  app.put("/api/users/:id/role", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { role } = req.body;
       const updatedUser = await storage.updateUserRole(req.params.id, role);
@@ -1256,7 +1267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Export endpoints for admin
-  app.get("/api/export/sellers", requireRole("admin"), async (req, res) => {
+  app.get("/api/export/sellers", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sellers = await storage.getAllSellers();
       const csvHeaders = "ID,Name,Email,Business Name,Status,Created At\n";
@@ -1273,7 +1284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/export/users", requireRole("admin"), async (req, res) => {
+  app.get("/api/export/users", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const users = await storage.getAllUsers();
       const csvHeaders = "ID,Name,Email,Role,Created At\n";
@@ -1290,7 +1301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/export/orders", requireRole("admin"), async (req, res) => {
+  app.get("/api/export/orders", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const orders = await storage.getOrders();
       const csvHeaders = "ID,Customer ID,Seller ID,Total,Status,Created At\n";
@@ -1308,7 +1319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics routes
-  app.get("/api/analytics/seller/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/analytics/seller/:id", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.getSellerByUserId(req.user!.userId);
       if (!seller || (req.params.id !== seller.id && req.user?.userRole !== "admin")) {
@@ -1323,7 +1334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/platform", requireRole("admin"), async (req, res) => {
+  app.get("/api/analytics/platform", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const stats = await storage.getPlatformStats();
       res.json(stats);
@@ -1336,7 +1347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─── REVIEWS ROUTES ──────────────────────────────────────────────────────────
 
   // Get product reviews
-  app.get("/api/products/:productId/reviews", async (req, res) => {
+  app.get("/api/products/:productId/reviews", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const reviews = await storage.getProductReviews(req.params.productId);
       res.json(reviews);
@@ -1347,7 +1358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a review (requires authentication)
-  app.post("/api/reviews", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/reviews", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const reviewData = insertReviewSchema.parse({
         ...req.body,
@@ -1363,7 +1374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get user reviews
-  app.get("/api/user/reviews", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/user/reviews", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const reviews = await storage.getUserReviews(req.user!.userId);
       res.json(reviews);
@@ -1374,7 +1385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update a review
-  app.put("/api/reviews/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/reviews/:id", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const review = await storage.updateReview(req.params.id, req.body);
       res.json(review);
@@ -1385,7 +1396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete a review
-  app.delete("/api/reviews/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/reviews/:id", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       await storage.deleteReview(req.params.id);
       res.status(204).send();
@@ -1398,7 +1409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─── INVENTORY ROUTES ────────────────────────────────────────────────────────
 
   // Get product inventory logs (Seller only)
-  app.get("/api/products/:productId/inventory", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/products/:productId/inventory", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const logs = await storage.getProductInventoryLogs(req.params.productId);
       res.json(logs);
@@ -1409,7 +1420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update product stock (Seller only)
-  app.post("/api/products/:productId/stock", requireRole("seller"), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/products/:productId/stock", requireRole("seller"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { quantityChange, reason } = req.body;
       await storage.updateProductStock(req.params.productId, quantityChange, reason);
