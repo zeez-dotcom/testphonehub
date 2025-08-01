@@ -642,7 +642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized" });
       } else if (req.user?.userRole === "seller") {
         const seller = await storage.getSellerByUserId(req.user.userId);
-        if (!seller || order.sellerId !== seller.id) {
+        if (!seller || order.sellerId !== seller.sellerId) {
           return res.status(403).json({ message: "Not authorized" });
         }
       }
@@ -828,7 +828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update seller with Kuwait compliance documents and uploaded files
-      const updatedSeller = await storage.updateSeller(seller.id, {
+      const updatedSeller = await storage.updateSeller(seller.sellerId, {
         businessName: req.body.businessName,
         businessType: req.body.businessType,
         phoneNumber: req.body.phoneNumber,
@@ -1166,7 +1166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update seller status to rejected
-      const updatedSeller = await storage.updateSeller(seller.id, {
+      const updatedSeller = await storage.updateSeller(seller.sellerId, {
         status: "rejected",
         rejectionReason: rejectionReason,
         updatedAt: new Date()
@@ -1311,7 +1311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/analytics/seller/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const seller = await storage.getSellerByUserId(req.user!.userId);
-      if (!seller || (req.params.id !== seller.id && req.user?.userRole !== "admin")) {
+      if (!seller || (req.params.id !== seller.sellerId && req.user?.userRole !== "admin")) {
         return res.status(403).json({ message: "Not authorized" });
       }
 
