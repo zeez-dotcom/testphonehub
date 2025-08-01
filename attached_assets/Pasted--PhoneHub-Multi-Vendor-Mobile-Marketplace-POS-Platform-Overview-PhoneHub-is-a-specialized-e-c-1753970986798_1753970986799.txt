@@ -1,0 +1,153 @@
+📱 PhoneHub - Multi-Vendor Mobile Marketplace & POS Platform
+
+Overview
+PhoneHub is a specialized e-commerce platform tailored for phones and accessories. It includes an integrated Point of Sale (POS) system, enabling seamless online and in-person sales. The system supports customers, vendors, and administrators in a centralized ecosystem for commerce, inventory, and analytics.
+
+🔐 User Roles & Access
+
+Role	Capabilities
+Customer	Browse, purchase, track orders
+Seller	Manage inventory, sell online and in-store (POS)
+Admin	Full platform control, seller approval, analytics
+🖥️ Frontend Architecture (React + TypeScript)
+
+Directory: client/src/
+
+components/
+├── ui/                  → UI components (shadcn/ui)
+├── navigation.tsx       → Role-based main navigation
+├── product-card.tsx     → Product display card
+└── seller-card.tsx      → Seller profile card
+
+pages/
+├── unified-auth.tsx     → Unified login/register component
+├── marketplace.tsx      → Product browsing interface
+├── seller-dashboard.tsx → Seller product/inventory manager
+├── admin-panel.tsx      → Admin interface for approvals & metrics
+├── pos-system.tsx       → In-store sales interface
+└── checkout.tsx         → Payment processing page
+
+hooks/
+└── useAuth.ts           → Authentication logic and user state
+
+lib/
+├── queryClient.ts       → API communication and TanStack Query config
+└── utils.ts             → Shared utility functions
+⚙️ Backend Architecture (Express + PostgreSQL + TypeScript)
+
+Directory: server/
+
+authService.ts          → Unified login/register logic
+authMiddleware.ts       → Role-based route protection
+routes.ts               → Central API routes
+storage.ts              → Database interaction layer
+paymentService.ts       → Simulated payment processing logic
+index.ts                → App bootstrap
+
+shared/
+└── schema.ts           → All database schemas and TypeScript types
+💡 Core Features
+
+1. 🔐 Authentication & Access
+Unified login/registration for all users
+Role-based routing and dashboard access
+PostgreSQL session storage using HTTP-only cookies
+Hardcoded admin login: testadmin / admin123
+Admin-only seller approval workflow
+2. 🛒 E-commerce Marketplace
+Product catalog with search, filters, and categories
+Shopping cart with quantity management
+Order lifecycle: cart → checkout → tracking
+Seller storefronts with profiles and listings
+3. 🧾 Point of Sale (POS)
+In-person sales with inventory sync
+Real-time updates between online/POS stock
+Supports cards, cash, and digital wallets
+Logs every in-person transaction in DB
+4. 🧑‍💼 Admin Dashboard
+Approve or reject pending sellers
+Monitor platform-wide product listings and sellers
+Track all orders across the platform
+Access performance metrics and analytics
+5. 🛍️ Seller Dashboard
+Manage product listings (CRUD)
+Handle orders and fulfillment
+Track inventory and sales performance
+Use POS interface for in-store operations
+6. 💳 Custom Payment Platform
+Supports cards, transfers, wallets, cash
+Simulated gateway with success/failure scenarios
+End-to-end payment lifecycle tracking
+Secure payment handling with error protection
+🧱 Database Schema
+
+Tables include:
+
+users – All registered users (with roles)
+sellers – Seller business profiles
+products – Product inventory and listings
+orders – Customer orders and POS transactions
+cart – Customer cart data
+payments – Payment and transaction metadata
+sessions – Session storage for user auth
+🧭 User Journeys
+
+Customer
+Register/login
+Browse products
+Add items to cart
+Checkout and pay
+Track orders and manage profile
+Seller
+Register as seller → awaits admin approval
+Create business profile
+List and manage products
+Fulfill online orders
+Make POS sales and track analytics
+Admin
+Login (hardcoded credentials)
+Approve/reject sellers
+Monitor platform data (orders, products, users)
+View analytics and platform activity
+🚧 Current Status
+
+✅ Authentication system fully functional
+✅ Complete database schema
+✅ All CRUD APIs implemented
+✅ All frontend pages completed
+✅ Basic POS system operational
+✅ Admin dashboard complete
+✅ Simulated payment processing integrated
+
+📋 Immediate Development Priorities
+
+Advanced product search & filters
+Seller analytics improvements
+POS mobile responsiveness
+Full gateway integration testing
+🔮 Planned Enhancements
+
+Product & User Features
+Real-time notifications (orders, messages)
+Customer reviews and ratings
+Advanced inventory and order management
+Multi-vendor shipping support
+Technical Improvements
+PostgreSQL optimization + indexing
+Caching layer (e.g., Redis)
+Security upgrades and vulnerability audits
+API rate limiting and abuse protection
+Mobile app (React Native or Flutter)
+📦 Technical Stack Summary
+
+Layer	Stack Used
+Frontend	React 18, TypeScript, TailwindCSS, shadcn/ui, Wouter, TanStack Query, Vite
+Backend	Node.js, Express, PostgreSQL, Drizzle ORM, TypeScript (ES modules)
+Auth	Session-based auth with PostgreSQL
+Payment	Simulated payment service with lifecycle logging
+If you’d like, I can also generate:
+
+Entity Relationship Diagrams (ERDs)
+QA testing checklist
+Performance review recommendations
+Deployment or CI/CD configuration suggestions

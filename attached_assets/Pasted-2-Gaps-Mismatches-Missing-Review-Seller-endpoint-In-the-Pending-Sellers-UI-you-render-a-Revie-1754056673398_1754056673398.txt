@@ -1,0 +1,67 @@
+2. Gaps & Mismatches
+
+Missing “Review Seller” endpoint
+In the Pending Sellers UI, you render a Review button (<Eye>Review</>), but you have no /api/sellers/:id GET endpoint returning full seller details.
+Suggested fix:
+// server/routes.ts
+app.get("/api/sellers/:id", requireRole("admin"), async (req, res) => {
+  const seller = await storage.getSeller(req.params.id);
+  if (!seller) return res.status(404).json({ message: "Not found" });
+  res.json(seller);
+});
+Admin “View Stats” per seller
+In the Active Sellers tab you render View Stats, but no endpoint exists. You’ll need something like:
+app.get("/api/sellers/:id/stats", requireRole("admin"), async (req, res) => {
+  const stats = await storage.getSellerStats(req.params.id);
+  res.json(stats);
+});
+Bulk actions & exports
+The UI shows buttons for Export Report, Export Users, Export Orders, etc., but no /api/export/... endpoints exist. Either remove/disable these or implement CSV export endpoints.
+User management page placeholder
+You describe user-role filtering and activity features in the UI, but there’s no backend support (e.g. /api/users, /api/users/:id/roles).
+Suggested endpoints:
+app.get("/api/users", requireRole("admin"), async (req, res) => {
+  const users = await storage.getAllUsers();
+  res.json(users);
+});
+app.put("/api/users/:id/role", requireRole("admin"), async (req, res) => {
+  const updated = await storage.updateUser(req.params.id, { role: req.body.role });
+  res.json(updated);
+});
+Inconsistent /api/seller/... vs /api/sellers/...
+You use both /api/seller/notifications (for seller-scoped) and /api/notifications (admin-scoped). It’s fine, but ensure your client never calls the wrong one. All admin calls should go to /api/notifications.
+Duplicate /checkout route
+You register /checkout under both seller and customer branches. You can define it once above the role-checks, since it’s shared.
+3. Structural Recommendations
+
+Centralize route protection
+Replace repeated {user?.role === "admin" && <Route …>} with a <ProtectedRoute requiredRole="admin">…</ProtectedRoute> component. This reduces duplication and keeps your main router concise.
+Consolidate shared routes
+Move /checkout and /pos-system out of per-role blocks; wrap them in <ProtectedRoute allowedRoles={["customer","seller","admin"]}>.
+Combine /customer-dashboard and /seller-dashboard into a single /dashboard that chooses which UI to render based on user.role.
+Centralized Admin API hooks
+Create a useAdminAPI() hook that bundles all admin queries/mutations:
+export function useAdminAPI() {
+  const qc = useQueryClient();
+  return {
+    analytics: useQuery(["analytics"], () => apiRequest("GET", "/api/analytics/platform")),
+    pendingProducts: useQuery(["products","pending"], () => apiRequest("GET", "/api/products/pending")),
+    approveProduct: useMutation(id => apiRequest("PUT", `/api/products/${id}/approve`), { onSuccess: () => qc.invalidateQueries() }),
+    // …etc
+  };
+}
+This makes your AdminPanel component much leaner.
+Sidebar navigation for admin
+Replace the top-of-page Tabs with a sticky sidebar. E.g.:
+/admin
+  ├─ /admin/dashboard
+  ├─ /admin/sellers/pending
+  ├─ /admin/sellers/approved
+  ├─ /admin/products/pending
+  ├─ /admin/notifications
+  ├─ /admin/settings
+Then each section is its own <Route path="/admin/sellers/pending">…</Route>.
+Implement missing endpoints
+Add the seller-review, seller-stats, users list, and export endpoints noted above so every UI action has a matching backend.
+Clean up migrations
+If you add any new columns (e.g. for audit logs, CSV export metadata), create incremental Drizzle migrations so your DB stays in sync.

@@ -1,0 +1,1425 @@
+import type { Express, Request, Response, NextFunction } from "express";
+import { createServer, type Server } from "http";
+import express from "express";
+import session from "express-session";
+import passport from "passport";
+import { storage } from "./storage";
+import { setupPassport, getConfiguredProviders } from "./auth";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import {
+  insertUserSchema,
+  insertSellerSchema,
+  insertProductSchema,
+  insertOrderSchema,
+  insertCartSchema,
+  insertPaymentSchema,
+  insertReviewSchema,
+} from "@shared/schema";
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    userId: string;
+    userRole: string;
+  };
+}
+
+// JWT Authentication middleware
+const JWT_SECRET = process.env.JWT_SECRET || "phonehub-jwt-secret-key-2024";
+
+// File upload configuration
+const uploadDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+  }),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow all common file types for seller documents
+    const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|doc|docx|txt|bmp|svg|tiff|tif/;
+    const allowedMimeTypes = /image\/.*|application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|text\/plain/;
+    
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedMimeTypes.test(file.mimetype);
+    
+    if (mimetype || extname) {
+      return cb(null, true);
+    } else {
+      console.log('File rejected:', file.originalname, file.mimetype);
+      cb(new Error(`File type not supported. Received: ${file.mimetype}. Please upload images (JPG, PNG, GIF, WebP, BMP, TIFF) or documents (PDF, DOC, DOCX, TXT).`));
+    }
+  }
+});
+
+function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Access token required" });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid token" });
+    }
+    req.user = decoded as { userId: string; userRole: string };
+    next();
+  });
+}
+
+// Authentication middleware
+function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  authenticateToken(req, res, next);
+}
+
+function requireRole(role: string) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: "Access token required" });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
+      if (err) {
+        return res.status(403).json({ message: "Invalid token" });
+      }
+      req.user = decoded as { userId: string; userRole: string };
+      
+      if (req.user.userRole !== role) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+      next();
+    });
+  };
+}
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Session configuration for OAuth
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'phonehub-session-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }));
+
+  // Initialize Passport
+  setupPassport();
+  app.use(passport.initialize());
+  app.use(passport.session());
+  
+  // Serve uploaded files statically
+  app.use('/uploads', (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
+  });
+  app.use('/uploads', express.static(uploadDir));
+
+  // File upload route
+  app.post("/api/upload", requireAuth, upload.single('file'), async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Generate the URL for the uploaded file
+      const fileUrl = `/uploads/${req.file.filename}`;
+      
+      res.json({
+        url: fileUrl,
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype
+      });
+    } catch (error) {
+      console.error("Upload error:", error);
+      res.status(500).json({ message: "Upload failed" });
+    }
+  });
+
+  // Authentication routes
+  app.post("/api/auth/register", async (req: AuthenticatedRequest, res) => {
+    try {
+      const userData = insertUserSchema.parse(req.body);
+      const existingUser = await storage.getUserByEmail(userData.email);
+      
+      if (existingUser) {
+        return res.status(400).json({ message: "User already exists" });
+      }
+
+      const user = await storage.createUser(userData);
+      // Session data is handled via JWT tokens
+
+      // If registering as seller, create seller profile
+      if (req.body.role === "seller" && req.body.businessName) {
+        await storage.createSeller({
+          userId: user.id,
+          businessName: req.body.businessName,
+          businessType: req.body.businessType,
+          location: req.body.location,
+          experience: req.body.experience,
+        });
+      }
+
+      res.json({ user, message: "Registration successful" });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(400).json({ message: "Registration failed" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req: AuthenticatedRequest, res) => {
+    try {
+      const { email, password } = req.body;
+
+      // Hardcoded admin login
+      if (email === "testadmin" && password === "admin123") {
+        let adminUser = await storage.getUserByEmail("admin@phonehub.com");
+        if (!adminUser) {
+          adminUser = await storage.createUser({
+            email: "admin@phonehub.com",
+            password: await bcrypt.hash("admin123", 10),
+            firstName: "Admin",
+            lastName: "User",
+            role: "admin",
+          });
+        }
+        
+        const token = jwt.sign(
+          { userId: adminUser.id, userRole: adminUser.role },
+          JWT_SECRET,
+          { expiresIn: '7d' }
+        );
+        
+        console.log("Admin login successful, token generated");
+        return res.json({ 
+          user: { ...adminUser, password: undefined }, 
+          token,
+          message: "Login successful" 
+        });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const token = jwt.sign(
+        { userId: user.id, userRole: user.role },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      console.log("User login successful, token generated");
+      res.json({ 
+        user: { ...user, password: undefined }, 
+        token,
+        message: "Login successful" 
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(400).json({ message: "Login failed" });
+    }
+  });
+
+  // OAuth Routes
+  // Get available authentication providers
+  app.get("/api/auth/providers", (req, res) => {
+    const providers = getConfiguredProviders();
+    res.json({ providers });
+  });
+
+  // Google OAuth routes
+  app.get("/api/auth/google", 
+    passport.authenticate("google", { scope: ["profile", "email"] })
+  );
+
+  app.get("/api/auth/google/callback",
+    passport.authenticate("google", { failureRedirect: "/auth?error=google_failed" }),
+    async (req, res) => {
+      try {
+        const user = req.user as any;
+        const token = jwt.sign(
+          { userId: user.id, userRole: user.role },
+          JWT_SECRET,
+          { expiresIn: "7d" }
+        );
+        
+        // Redirect to frontend with token
+        res.redirect(`/?token=${token}&user=${encodeURIComponent(JSON.stringify(user))}`);
+      } catch (error) {
+        console.error("Google OAuth callback error:", error);
+        res.redirect("/auth?error=oauth_failed");
+      }
+    }
+  );
+
+  // Apple OAuth routes
+  app.get("/api/auth/apple",
+    passport.authenticate("apple")
+  );
+
+  app.post("/api/auth/apple/callback",
+    passport.authenticate("apple", { failureRedirect: "/auth?error=apple_failed" }),
+    async (req, res) => {
+      try {
+        const user = req.user as any;
+        const token = jwt.sign(
+          { userId: user.id, userRole: user.role },
+          JWT_SECRET,
+          { expiresIn: "7d" }
+        );
+        
+        // Redirect to frontend with token
+        res.redirect(`/?token=${token}&user=${encodeURIComponent(JSON.stringify(user))}`);
+      } catch (error) {
+        console.error("Apple OAuth callback error:", error);
+        res.redirect("/auth?error=oauth_failed");
+      }
+    }
+  );
+
+  app.post("/api/auth/logout", (req: AuthenticatedRequest, res) => {
+    // With JWT, logout is handled client-side by removing the token
+    res.json({ message: "Logout successful" });
+  });
+
+  app.get("/api/auth/user", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.user.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ ...user, password: undefined });
+    } catch (error) {
+      console.error("Get user error:", error);
+      res.status(500).json({ message: "Failed to get user" });
+    }
+  });
+
+  // Product routes (Only show approved products in marketplace)
+  app.get("/api/products", async (req, res) => {
+    try {
+      const filters = {
+        category: req.query.category as string,
+        brand: req.query.brand as string,
+        minPrice: req.query.minPrice ? parseFloat(req.query.minPrice as string) : undefined,
+        maxPrice: req.query.maxPrice ? parseFloat(req.query.maxPrice as string) : undefined,
+        condition: req.query.condition as string,
+        search: req.query.search as string,
+        sellerId: req.query.sellerId as string,
+        status: "approved", // Only show approved products in marketplace
+      };
+
+      const products = await storage.getProducts(filters);
+      res.json(products);
+    } catch (error) {
+      console.error("Get products error:", error);
+      res.status(500).json({ message: "Failed to get products" });
+    }
+  });
+
+  app.get("/api/products/seller", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      // Get products for the current seller
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+      
+      // Get all products for this seller (including pending, approved, rejected)
+      const products = await storage.getProducts({ 
+        sellerId: seller.sellerId,
+        includeInactive: true // Include all statuses for seller's own products
+      });
+      res.json(products);
+    } catch (error) {
+      console.error("Get seller products error:", error);
+      res.status(500).json({ message: "Failed to get seller products" });
+    }
+  });
+
+  // Get seller notifications
+  app.get("/api/seller/notifications", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+      
+      const notifications = await storage.getSellerNotifications(seller.sellerId, 50);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Get seller notifications error:", error);
+      res.status(500).json({ message: "Failed to get seller notifications" });
+    }
+  });
+
+  // Mark seller notification as read
+  app.put("/api/seller/notifications/:id/read", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.markNotificationRead(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Mark seller notification read error:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  app.post("/api/products", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      // Check if user is a seller (approved sellers can add products that go to pending)
+      const user = req.user!;
+      if (user.userRole !== "seller") {
+        return res.status(403).json({ message: "Seller access required" });
+      }
+
+      // Check if seller exists and is approved
+      const seller = await storage.getSellerByUserId(user.userId);
+      if (!seller || seller.status !== "approved") {
+        return res.status(403).json({ message: "Seller must be approved to add products" });
+      }
+
+      const productData = insertProductSchema.parse({
+        ...req.body,
+        price: req.body.price.toString(), // Keep as string for decimal type
+        stock: parseInt(req.body.stock), // Convert to integer
+        sellerId: seller.sellerId, // Use the seller record ID from sellers table
+        status: "pending", // Products start as pending
+      });
+
+      const product = await storage.createProduct(productData);
+      
+      // Create notification for admin
+      await storage.createNotification({
+        type: "product_pending",
+        title: "New Product Pending Approval",
+        message: `${seller.businessName || seller.firstName} has submitted a new product "${product.name}" for approval.`,
+        relatedId: product.id,
+        metadata: { 
+          sellerId: seller.sellerId, 
+          sellerName: seller.businessName || seller.firstName,
+          productName: product.name 
+        }
+      });
+
+      res.json(product);
+    } catch (error) {
+      console.error("Create product error:", error);
+      res.status(400).json({ message: "Failed to create product" });
+    }
+  });
+
+  app.put("/api/products/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // Check if the user owns this product
+      if (product.sellerId !== req.user!.userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const updates = insertProductSchema.partial().parse(req.body);
+      const updatedProduct = await storage.updateProduct(req.params.id, updates);
+      res.json(updatedProduct);
+    } catch (error) {
+      console.error("Update product error:", error);
+      res.status(400).json({ message: "Failed to update product" });
+    }
+  });
+
+  app.delete("/api/products/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // Check if the user owns this product
+      if (product.sellerId !== req.user!.userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      await storage.deleteProduct(req.params.id);
+      res.json({ message: "Product deleted" });
+    } catch (error) {
+      console.error("Delete product error:", error);
+      res.status(500).json({ message: "Failed to delete product" });
+    }
+  });
+
+  // Cart routes
+  app.get("/api/cart", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const cartItems = await storage.getCartItems(req.user!.userId);
+      res.json(cartItems);
+    } catch (error) {
+      console.error("Get cart error:", error);
+      res.status(500).json({ message: "Failed to get cart" });
+    }
+  });
+
+  app.post("/api/cart", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const cartData = insertCartSchema.parse({
+        ...req.body,
+        userId: req.user!.userId,
+      });
+
+      const cartItem = await storage.addToCart(cartData);
+      res.json(cartItem);
+    } catch (error) {
+      console.error("Add to cart error:", error);
+      res.status(400).json({ message: "Failed to add to cart" });
+    }
+  });
+
+  app.put("/api/cart/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { quantity } = req.body;
+      const cartItem = await storage.updateCartItem(req.params.id, quantity);
+      res.json(cartItem);
+    } catch (error) {
+      console.error("Update cart error:", error);
+      res.status(400).json({ message: "Failed to update cart" });
+    }
+  });
+
+  app.delete("/api/cart/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.removeFromCart(req.params.id);
+      res.json({ message: "Item removed from cart" });
+    } catch (error) {
+      console.error("Remove from cart error:", error);
+      res.status(500).json({ message: "Failed to remove from cart" });
+    }
+  });
+
+  // Order routes
+  app.get("/api/orders", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const filters: any = {};
+      
+      if (req.user!.userRole === "customer") {
+        filters.customerId = req.user!.userId;
+      } else if (req.user!.userRole === "seller") {
+        const seller = await storage.getSellerByUserId(req.user!.userId);
+        if (seller) {
+          filters.sellerId = seller.sellerId;
+        }
+      }
+      // Admin can see all orders (no filters)
+
+      const orders = await storage.getOrders(filters);
+      res.json(orders);
+    } catch (error) {
+      console.error("Get orders error:", error);
+      res.status(500).json({ message: "Failed to get orders" });
+    }
+  });
+
+  // Get seller orders with enhanced details
+  app.get("/api/orders/seller", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+      
+      const orders = await storage.getSellerOrders(seller.sellerId);
+      res.json(orders);
+    } catch (error) {
+      console.error("Get seller orders error:", error);
+      res.status(500).json({ message: "Failed to get seller orders" });
+    }
+  });
+
+  app.post("/api/orders", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      // Get cart items to check stock
+      const cartItems = await storage.getCartItems(req.user!.userId);
+      if (cartItems.length === 0) {
+        return res.status(400).json({ message: "Cart is empty" });
+      }
+
+      // Check stock availability
+      for (const item of cartItems) {
+        const product = await storage.getProduct(item.productId);
+        if (!product) {
+          return res.status(400).json({ message: `Product ${item.productId} not found` });
+        }
+        if (product.stock < item.quantity) {
+          return res.status(400).json({ 
+            message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}` 
+          });
+        }
+      }
+
+      // Calculate total - get price from product since cart item doesn't have price
+      let total = 0;
+      for (const item of cartItems) {
+        const product = await storage.getProduct(item.productId);
+        if (product) {
+          total += parseFloat(product.price) * item.quantity;
+        }
+      }
+
+      // Get seller ID from first product (single-vendor cart for now)
+      const firstProduct = await storage.getProduct(cartItems[0].productId);
+      
+      const orderData = insertOrderSchema.parse({
+        customerId: req.user!.userId,
+        sellerId: firstProduct?.sellerId || "",
+        total: total.toString(),
+        status: "pending",
+        paymentStatus: "pending",
+        items: cartItems,
+        ...req.body,
+      });
+
+      const order = await storage.createOrder(orderData);
+
+      // Update inventory for each item
+      for (const item of cartItems) {
+        await storage.updateProductStock(item.productId, -item.quantity, "Sale", order.id);
+      }
+
+      // Clear cart after order creation if not POS order
+      if (!orderData.isPosOrder) {
+        await storage.clearCart(req.user!.userId);
+      }
+
+      res.json(order);
+    } catch (error) {
+      console.error("Create order error:", error);
+      res.status(500).json({ message: "Failed to create order" });
+    }
+  });
+
+  app.put("/api/orders/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Check authorization
+      if (req.user?.userRole === "customer" && order.customerId !== req.user.userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      } else if (req.user?.userRole === "seller") {
+        const seller = await storage.getSellerByUserId(req.user.userId);
+        if (!seller || order.sellerId !== seller.id) {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+      }
+
+      const updates = insertOrderSchema.partial().parse(req.body);
+      const updatedOrder = await storage.updateOrder(req.params.id, updates);
+      res.json(updatedOrder);
+    } catch (error) {
+      console.error("Update order error:", error);
+      res.status(400).json({ message: "Failed to update order" });
+    }
+  });
+
+  // Payment routes
+  app.post("/api/payments", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const paymentData = insertPaymentSchema.parse(req.body);
+      
+      // Simulate payment processing
+      const isSuccess = Math.random() > 0.1; // 90% success rate
+      const status = isSuccess ? "completed" : "failed";
+      
+      const payment = await storage.createPayment({
+        ...paymentData,
+        status: status as any,
+        transactionId: `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      });
+
+      // Update order status if payment successful
+      if (status === "completed") {
+        await storage.updateOrder(paymentData.orderId, { status: "processing" });
+      }
+
+      res.json(payment);
+    } catch (error) {
+      console.error("Process payment error:", error);
+      res.status(400).json({ message: "Payment processing failed" });
+    }
+  });
+
+  // Receipt generation route
+  app.get("/api/orders/:orderId/receipt", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const orderId = req.params.orderId;
+      const order = await storage.getOrder(orderId);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Authorization check
+      if (req.user?.userRole === "customer" && order.customerId !== req.user.userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      } else if (req.user?.userRole === "seller") {
+        const seller = await storage.getSellerByUserId(req.user.userId);
+        if (!seller || order.sellerId !== seller.sellerId) {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+      }
+
+      // Get seller details
+      const sellerDetails = await storage.getSellerByUserId(
+        req.user?.userRole === "seller" 
+          ? req.user.userId 
+          : order.sellerId || ""
+      );
+
+      // Get customer details
+      const customer = await storage.getUser(order.customerId);
+
+      // Get payment details
+      const payments = await storage.getPaymentsByOrderId(orderId);
+      const payment = payments[0]; // Assuming single payment per order
+
+      // Prepare receipt data
+      const receiptData = {
+        order,
+        seller: {
+          businessName: sellerDetails?.businessName || "PhoneHub Seller",
+          businessLogo: sellerDetails?.businessLogo,
+          businessEmail: sellerDetails?.businessEmail,
+          phoneNumber: sellerDetails?.phoneNumber,
+          whatsappNumber: sellerDetails?.whatsappNumber,
+          businessAddress: sellerDetails?.businessAddress,
+          businessWebsite: sellerDetails?.businessWebsite,
+        },
+        customer: {
+          firstName: customer?.firstName,
+          lastName: customer?.lastName,
+          email: customer?.email,
+        },
+        items: Array.isArray(order.items) ? order.items : [],
+        paymentMethod: payment?.method || "cash",
+        amountReceived: payment?.metadata && typeof payment.metadata === 'object' && 'amountReceived' in payment.metadata ? (payment.metadata as any).amountReceived : undefined,
+        changeAmount: payment?.metadata && typeof payment.metadata === 'object' && 'changeAmount' in payment.metadata ? (payment.metadata as any).changeAmount : undefined,
+      };
+
+      res.json(receiptData);
+    } catch (error) {
+      console.error("Get receipt error:", error);
+      res.status(500).json({ message: "Failed to generate receipt" });
+    }
+  });
+
+  // Seller routes
+  app.get("/api/sellers/pending", requireRole("admin"), async (req, res) => {
+    try {
+      const pendingSellers = await storage.getPendingSellers();
+      res.json(pendingSellers);
+    } catch (error) {
+      console.error("Get pending sellers error:", error);
+      res.status(500).json({ message: "Failed to get pending sellers" });
+    }
+  });
+
+  app.get("/api/sellers/approved", requireRole("admin"), async (req, res) => {
+    try {
+      const approvedSellers = await storage.getApprovedSellers();
+      res.json(approvedSellers);
+    } catch (error) {
+      console.error("Get approved sellers error:", error);
+      res.status(500).json({ message: "Failed to get approved sellers" });
+    }
+  });
+
+  app.get("/api/sellers", requireRole("admin"), async (req, res) => {
+    try {
+      const sellers = await storage.getAllSellers();
+      res.json(sellers);
+    } catch (error) {
+      console.error("Get sellers error:", error);
+      res.status(500).json({ message: "Failed to get sellers" });
+    }
+  });
+
+  app.put("/api/sellers/:id/approve", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const seller = await storage.approveSeller(req.params.id, req.user!.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+      res.json(seller);
+    } catch (error) {
+      console.error("Approve seller error:", error);
+      res.status(500).json({ message: "Failed to approve seller" });
+    }
+  });
+
+  app.put("/api/sellers/:id/reject", requireRole("admin"), async (req, res) => {
+    try {
+      // For simplified implementation, we just return success
+      const seller = await storage.getSeller(req.params.id);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+      res.json({ ...seller, status: "rejected" });
+    } catch (error) {
+      console.error("Reject seller error:", error);
+      res.status(500).json({ message: "Failed to reject seller" });
+    }
+  });
+
+  // Get seller profile route
+  app.get("/api/seller/profile", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+      res.json(seller);
+    } catch (error) {
+      console.error("Get seller profile error:", error);
+      res.status(500).json({ message: "Failed to get seller profile" });
+    }
+  });
+
+  // Seller document submission route
+  app.put("/api/seller/documents", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+
+      // Update seller with Kuwait compliance documents and uploaded files
+      const updatedSeller = await storage.updateSeller(seller.id, {
+        businessName: req.body.businessName,
+        businessType: req.body.businessType,
+        phoneNumber: req.body.phoneNumber,
+        whatsappNumber: req.body.whatsappNumber,
+        businessAddress: req.body.businessAddress,
+        shopLicenseNumber: req.body.shopLicenseNumber,
+        ownerCivilId: req.body.ownerCivilId,
+        // Document files
+        businessLogo: req.body.businessLogo,
+        shopLicenseImage: req.body.shopLicenseImage,
+        ownerCivilIdImage: req.body.ownerCivilIdImage,
+        ownerPhoto: req.body.ownerPhoto,
+        status: "pending", // Set status to pending after document submission
+        updatedAt: new Date()
+      });
+
+      res.json(updatedSeller);
+    } catch (error) {
+      console.error("Update seller documents error:", error);
+      res.status(500).json({ message: "Failed to update documents" });
+    }
+  });
+
+  // Admin routes for document management
+  app.get("/api/admin/sellers/documents", requireRole("admin"), async (req, res) => {
+    try {
+      const sellers = await storage.getSellersWithDocuments();
+      res.json(sellers);
+    } catch (error) {
+      console.error("Get sellers with documents error:", error);
+      res.status(500).json({ message: "Failed to get sellers with documents" });
+    }
+  });
+
+  app.put("/api/admin/sellers/:id/approve-documents", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const sellerId = req.params.id;
+      const updatedSeller = await storage.updateSeller(sellerId, {
+        status: "approved",
+        approvedAt: new Date(),
+        approvedBy: req.user!.userId,
+        updatedAt: new Date()
+      });
+
+      if (!updatedSeller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+
+      res.json(updatedSeller);
+    } catch (error) {
+      console.error("Approve seller documents error:", error);
+      res.status(500).json({ message: "Failed to approve seller documents" });
+    }
+  });
+
+  app.put("/api/admin/sellers/:id/reject-documents", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const sellerId = req.params.id;
+      const { rejectionReason } = req.body;
+      
+      const updatedSeller = await storage.updateSeller(sellerId, {
+        status: "rejected",
+        rejectionReason: rejectionReason,
+        updatedAt: new Date()
+      });
+
+      if (!updatedSeller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+
+      res.json(updatedSeller);
+    } catch (error) {
+      console.error("Reject seller documents error:", error);
+      res.status(500).json({ message: "Failed to reject seller documents" });
+    }
+  });
+
+  // Product approval routes (Admin only) - MUST come before /api/products/:id
+  app.get("/api/products/pending", requireRole("admin"), async (req, res) => {
+    try {
+      const products = await storage.getPendingProducts();
+      res.json(products);
+    } catch (error) {
+      console.error("Get pending products error:", error);
+      res.status(500).json({ message: "Failed to get pending products" });
+    }
+  });
+
+  // Get detailed product with seller information - MUST come before generic :id route
+  app.get("/api/products/:id/details", async (req, res) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // Get seller details including user info and seller profile
+      const seller = await storage.getSeller(product.sellerId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+
+      const sellerUser = await storage.getUser(seller.userId);
+      if (!sellerUser) {
+        return res.status(404).json({ message: "Seller user not found" });
+      }
+
+      // Combine seller information
+      const sellerDetails = {
+        id: seller.id,
+        businessName: seller.businessName,
+        location: seller.location,
+        phoneNumber: seller.phoneNumber,
+        businessAddress: seller.businessAddress,
+        firstName: sellerUser.firstName,
+        lastName: sellerUser.lastName,
+        email: sellerUser.email,
+        rating: "4.8", // This could be calculated from reviews in the future
+        reviewCount: 47, // This could be fetched from reviews table
+        joinedDate: seller.createdAt,
+      };
+
+      res.json({
+        ...product,
+        seller: sellerDetails,
+      });
+    } catch (error) {
+      console.error("Error fetching product details:", error);
+      res.status(500).json({ message: "Failed to fetch product details" });
+    }
+  });
+
+  // Individual product route - MUST come after specific routes like /pending and /details
+  app.get("/api/products/:id", async (req, res) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("Get product error:", error);
+      res.status(500).json({ message: "Failed to get product" });
+    }
+  });
+
+  app.put("/api/products/:id/approve", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const product = await storage.approveProduct(req.params.id, req.user!.userId);
+      
+      // Create notification for seller
+      await storage.createNotification({
+        type: "product_approved",
+        title: "Product Approved!",
+        message: `Great news! Your product "${product.name}" has been approved and is now live in the marketplace.`,
+        relatedId: product.id,
+        sellerId: product.sellerId,
+        metadata: { productName: product.name, approvedBy: req.user!.userId }
+      });
+
+      res.json(product);
+    } catch (error) {
+      console.error("Approve product error:", error);
+      res.status(500).json({ message: "Failed to approve product" });
+    }
+  });
+
+  app.put("/api/products/:id/reject", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { reason = "Product does not meet marketplace standards" } = req.body;
+      const product = await storage.rejectProduct(req.params.id, reason);
+      
+      // Create notification for seller
+      await storage.createNotification({
+        type: "product_rejected",
+        title: "Product Needs Updates",
+        message: `Your product "${product.name}" needs some updates before approval. Reason: ${reason}`,
+        relatedId: product.id,
+        sellerId: product.sellerId,
+        metadata: { productName: product.name, rejectionReason: reason }
+      });
+
+      res.json(product);
+    } catch (error) {
+      console.error("Reject product error:", error);
+      res.status(500).json({ message: "Failed to reject product" });
+    }
+  });
+
+  // Notifications routes (Admin only)
+  app.get("/api/notifications", requireRole("admin"), async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const notifications = await storage.getNotifications(limit);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Get notifications error:", error);
+      res.status(500).json({ message: "Failed to get notifications" });
+    }
+  });
+
+  app.put("/api/notifications/:id/read", requireRole("admin"), async (req, res) => {
+    try {
+      await storage.markNotificationRead(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Mark notification read error:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  // Admin settings routes
+  app.get("/api/admin/settings", requireRole("admin"), async (req, res) => {
+    try {
+      const notificationEmail = await storage.getAdminSetting("notification_email");
+      res.json({ 
+        notification_email: notificationEmail || "admin@phonehub.com",
+        // Add other settings as needed
+      });
+    } catch (error) {
+      console.error("Get admin settings error:", error);
+      res.status(500).json({ message: "Failed to get admin settings" });
+    }
+  });
+
+  app.put("/api/admin/settings", requireRole("admin"), async (req, res) => {
+    try {
+      if (req.body.notification_email) {
+        await storage.setAdminSetting(
+          "notification_email", 
+          req.body.notification_email,
+          "Email address for admin notifications"
+        );
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Update admin settings error:", error);
+      res.status(500).json({ message: "Failed to update admin settings" });
+    }
+  });
+
+  // Individual seller details route (Admin only)
+  app.get("/api/sellers/:id", requireRole("admin"), async (req, res) => {
+    try {
+      const seller = await storage.getSeller(req.params.id);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+      res.json(seller);
+    } catch (error) {
+      console.error("Get seller details error:", error);
+      res.status(500).json({ message: "Failed to get seller details" });
+    }
+  });
+
+  // Seller stats route (Admin only)
+  app.get("/api/sellers/:id/stats", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const sellerId = req.params.id;
+      const stats = await storage.getSellerAnalytics(sellerId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Get seller stats error:", error);
+      res.status(500).json({ message: "Failed to get seller stats" });
+    }
+  });
+
+  // Users management routes (Admin only)
+  app.get("/api/users", requireRole("admin"), async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Get users error:", error);
+      res.status(500).json({ message: "Failed to get users" });
+    }
+  });
+
+  // Get customers only (Admin only)
+  app.get("/api/admin/customers", requireRole("admin"), async (req, res) => {
+    try {
+      const customers = await storage.getCustomers();
+      res.json(customers);
+    } catch (error) {
+      console.error("Get customers error:", error);
+      res.status(500).json({ message: "Failed to get customers" });
+    }
+  });
+  
+  // Get sellers only (Admin only)
+  app.get("/api/admin/sellers", requireRole("admin"), async (req, res) => {
+    try {
+      const sellers = await storage.getAllSellers();
+      res.json(sellers);
+    } catch (error) {
+      console.error("Get sellers error:", error);
+      res.status(500).json({ message: "Failed to get sellers" });
+    }
+  });
+
+  // Get sellers with documents for admin review
+  app.get("/api/admin/sellers/documents", requireRole("admin"), async (req, res) => {
+    try {
+      const sellersWithDocuments = await storage.getSellersWithDocuments();
+      res.json(sellersWithDocuments);
+    } catch (error) {
+      console.error("Get sellers with documents error:", error);
+      res.status(500).json({ message: "Failed to get sellers with documents" });
+    }
+  });
+
+  // Approve seller documents
+  app.put("/api/admin/sellers/:userId/approve-documents", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const seller = await storage.approveSeller(req.params.userId, req.user!.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+      res.json({ message: "Seller documents approved successfully", seller });
+    } catch (error) {
+      console.error("Approve seller documents error:", error);
+      res.status(500).json({ message: "Failed to approve seller documents" });
+    }
+  });
+
+  // Reject seller documents
+  app.put("/api/admin/sellers/:userId/reject-documents", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { rejectionReason } = req.body;
+      
+      // Get seller profile to update
+      const seller = await storage.getSellerByUserId(req.params.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+
+      // Update seller status to rejected
+      const updatedSeller = await storage.updateSeller(seller.id, {
+        status: "rejected",
+        rejectionReason: rejectionReason,
+        updatedAt: new Date()
+      });
+      
+      res.json({ message: "Seller documents rejected", seller: updatedSeller });
+    } catch (error) {
+      console.error("Reject seller documents error:", error);
+      res.status(500).json({ message: "Failed to reject seller documents" });
+    }
+  });
+
+  // Admin upload document on behalf of seller
+  app.put("/api/admin/sellers/:userId/upload-document", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { field, fileUrl } = req.body;
+      
+      // Get seller profile to update
+      const seller = await storage.getSellerByUserId(req.params.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+
+      // Validate field name
+      const allowedFields = ['businessLogo', 'shopLicenseImage', 'ownerCivilIdImage', 'ownerPhoto'];
+      if (!allowedFields.includes(field)) {
+        return res.status(400).json({ message: "Invalid document field" });
+      }
+
+      // Update the specific document field
+      const updateData = {
+        [field]: fileUrl,
+        updatedAt: new Date()
+      };
+
+      const updatedSeller = await storage.updateSeller(seller.sellerId || seller.id, updateData);
+      
+      res.json({ message: "Document uploaded successfully", seller: updatedSeller });
+    } catch (error) {
+      console.error("Admin upload document error:", error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  // Admin edit seller details
+  app.put("/api/admin/sellers/:userId/edit-details", requireRole("admin"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { businessName, businessType, phoneNumber, whatsappNumber, businessAddress, shopLicenseNumber, ownerCivilId } = req.body;
+      
+      // Get seller profile to update
+      const seller = await storage.getSellerByUserId(req.params.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+
+      // Filter out undefined/null values and create clean update object
+      const updateData: any = {};
+      if (businessName !== undefined) updateData.businessName = businessName;
+      if (businessType !== undefined) updateData.businessType = businessType;
+      if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+      if (whatsappNumber !== undefined) updateData.whatsappNumber = whatsappNumber;
+      if (businessAddress !== undefined) updateData.businessAddress = businessAddress;
+      if (shopLicenseNumber !== undefined) updateData.shopLicenseNumber = shopLicenseNumber;
+      if (ownerCivilId !== undefined) updateData.ownerCivilId = ownerCivilId;
+      
+      console.log("Updating seller with data:", updateData);
+      console.log("Seller ID to update:", seller.sellerId);
+
+      const updatedSeller = await storage.updateSeller(seller.sellerId, updateData);
+      
+      res.json({ message: "Seller details updated successfully", seller: updatedSeller });
+    } catch (error) {
+      console.error("Admin edit seller details error:", error);
+      res.status(500).json({ message: "Failed to update seller details" });
+    }
+  });
+
+  app.put("/api/users/:id/role", requireRole("admin"), async (req, res) => {
+    try {
+      const { role } = req.body;
+      const updatedUser = await storage.updateUserRole(req.params.id, role);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Update user role error:", error);
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  // Export endpoints for admin
+  app.get("/api/export/sellers", requireRole("admin"), async (req, res) => {
+    try {
+      const sellers = await storage.getAllSellers();
+      const csvHeaders = "ID,Name,Email,Business Name,Status,Created At\n";
+      const csvData = sellers.map(seller => 
+        `${seller.id},"${seller.firstName} ${seller.lastName}","${seller.email}","${(seller as any).businessName || 'N/A'}","${seller.role}","${seller.createdAt}"`
+      ).join("\n");
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="sellers-export.csv"');
+      res.send(csvHeaders + csvData);
+    } catch (error) {
+      console.error("Export sellers error:", error);
+      res.status(500).json({ message: "Failed to export sellers" });
+    }
+  });
+
+  app.get("/api/export/users", requireRole("admin"), async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const csvHeaders = "ID,Name,Email,Role,Created At\n";
+      const csvData = users.map(user => 
+        `${user.id},"${user.firstName} ${user.lastName}","${user.email}","${user.role}","${user.createdAt}"`
+      ).join("\n");
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="users-export.csv"');
+      res.send(csvHeaders + csvData);
+    } catch (error) {
+      console.error("Export users error:", error);
+      res.status(500).json({ message: "Failed to export users" });
+    }
+  });
+
+  app.get("/api/export/orders", requireRole("admin"), async (req, res) => {
+    try {
+      const orders = await storage.getOrders();
+      const csvHeaders = "ID,Customer ID,Seller ID,Total,Status,Created At\n";
+      const csvData = orders.map(order => 
+        `${order.id},"${order.customerId}","${order.sellerId}","${order.total}","${order.status}","${order.createdAt}"`
+      ).join("\n");
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="orders-export.csv"');
+      res.send(csvHeaders + csvData);
+    } catch (error) {
+      console.error("Export orders error:", error);
+      res.status(500).json({ message: "Failed to export orders" });
+    }
+  });
+
+  // Analytics routes
+  app.get("/api/analytics/seller/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller || (req.params.id !== seller.id && req.user?.userRole !== "admin")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const stats = await storage.getSellerStats(req.params.id);
+      res.json(stats);
+    } catch (error) {
+      console.error("Get seller stats error:", error);
+      res.status(500).json({ message: "Failed to get seller stats" });
+    }
+  });
+
+  app.get("/api/analytics/platform", requireRole("admin"), async (req, res) => {
+    try {
+      const stats = await storage.getPlatformStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Get platform stats error:", error);
+      res.status(500).json({ message: "Failed to get platform stats" });
+    }
+  });
+
+  // ─── REVIEWS ROUTES ──────────────────────────────────────────────────────────
+
+  // Get product reviews
+  app.get("/api/products/:productId/reviews", async (req, res) => {
+    try {
+      const reviews = await storage.getProductReviews(req.params.productId);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Get product reviews error:", error);
+      res.status(500).json({ message: "Failed to get reviews" });
+    }
+  });
+
+  // Create a review (requires authentication)
+  app.post("/api/reviews", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const reviewData = insertReviewSchema.parse({
+        ...req.body,
+        userId: req.user!.userId,
+      });
+
+      const review = await storage.createReview(reviewData);
+      res.status(201).json(review);
+    } catch (error) {
+      console.error("Create review error:", error);
+      res.status(500).json({ message: "Failed to create review" });
+    }
+  });
+
+  // Get user reviews
+  app.get("/api/user/reviews", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const reviews = await storage.getUserReviews(req.user!.userId);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Get user reviews error:", error);
+      res.status(500).json({ message: "Failed to get user reviews" });
+    }
+  });
+
+  // Update a review
+  app.put("/api/reviews/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const review = await storage.updateReview(req.params.id, req.body);
+      res.json(review);
+    } catch (error) {
+      console.error("Update review error:", error);
+      res.status(500).json({ message: "Failed to update review" });
+    }
+  });
+
+  // Delete a review
+  app.delete("/api/reviews/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.deleteReview(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete review error:", error);
+      res.status(500).json({ message: "Failed to delete review" });
+    }
+  });
+
+  // ─── INVENTORY ROUTES ────────────────────────────────────────────────────────
+
+  // Get product inventory logs (Seller only)
+  app.get("/api/products/:productId/inventory", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const logs = await storage.getProductInventoryLogs(req.params.productId);
+      res.json(logs);
+    } catch (error) {
+      console.error("Get inventory logs error:", error);
+      res.status(500).json({ message: "Failed to get inventory logs" });
+    }
+  });
+
+  // Update product stock (Seller only)
+  app.post("/api/products/:productId/stock", requireRole("seller"), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { quantityChange, reason } = req.body;
+      await storage.updateProductStock(req.params.productId, quantityChange, reason);
+      res.json({ message: "Stock updated successfully" });
+    } catch (error) {
+      console.error("Update stock error:", error);
+      res.status(500).json({ message: "Failed to update stock" });
+    }
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}
