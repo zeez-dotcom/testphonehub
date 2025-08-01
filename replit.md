@@ -62,6 +62,18 @@ Preferred communication style: Simple, everyday language.
 - **Order oversight**: Administrative view of all platform orders
 - **Content moderation**: Product and seller approval processes
 
+### Default Admin Account
+
+On first launch you can log in with the following credentials to create the
+initial admin user:
+
+```
+email: testadmin
+password: admin123
+```
+
+Logging in with this default account automatically sets up the admin role.
+
 ## Data Flow
 
 ### Authentication Flow
