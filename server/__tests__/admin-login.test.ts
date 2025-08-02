@@ -18,15 +18,17 @@ vi.mock('../storage', () => {
   };
 });
 
-import { registerRoutes } from '../routes';
+let registerRoutes: any;
 
 describe('admin login', () => {
   const app = express();
   let server: any;
 
   beforeAll(async () => {
+    process.env.JWT_SECRET = 'testsecret';
     process.env.ADMIN_EMAIL = 'admin@example.com';
     process.env.ADMIN_PASSWORD = 'secret';
+    ({ registerRoutes } = await import('../routes'));
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
     server = await registerRoutes(app);

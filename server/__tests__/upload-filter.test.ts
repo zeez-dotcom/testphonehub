@@ -4,6 +4,7 @@ import type { Request } from 'express';
 let fileFilter: typeof import('../routes').fileFilter;
 
 beforeAll(async () => {
+  process.env.JWT_SECRET = 'testsecret';
   process.env.DATABASE_URL = 'postgres://user:pass@localhost:5432/db';
   ({ fileFilter } = await import('../routes'));
 });
