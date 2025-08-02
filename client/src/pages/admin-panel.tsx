@@ -702,22 +702,46 @@ export default function AdminPanel() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {(pendingProducts as Product[]).map((product: Product) => (
-                      <div key={product.id} className="p-4 border rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
+                    {(pendingProducts as Product[]).map((product: Product) => {
+                      const seller = (sellersWithDocuments as SellerWithDocuments[]).find(
+                        (s) => s.id === product.sellerId
+                      );
+                      return (
+                        <div
+                          key={product.id}
+                          className="p-4 border rounded-lg flex items-start gap-4"
+                        >
+                          {product.imageUrl && (
+                            <img
+                              src={product.imageUrl}
+                              alt={product.name}
+                              className="w-24 h-24 object-cover rounded-md"
+                            />
+                          )}
+                          <div className="flex-1 space-y-1">
                             <h4 className="font-semibold">{product.name}</h4>
-                            <p className="text-sm text-slate-600 mt-1">
+                            <p className="text-sm text-slate-600">
                               {product.description}
                             </p>
-                            <p className="text-sm font-medium mt-2">
+                            <p className="text-sm font-medium">
                               {formatCurrency(product.price)}
                             </p>
                             <p className="text-xs text-slate-500">
                               Category: {product.category}
                             </p>
+                            <p className="text-xs text-slate-500">
+                              SKU: {product.sku || "N/A"}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              Stock: {product.stock}
+                            </p>
+                            {seller && (
+                              <p className="text-xs text-slate-500">
+                                Seller: {seller.businessName} ({seller.email})
+                              </p>
+                            )}
                           </div>
-                          <div className="flex space-x-2 ml-4">
+                          <div className="flex flex-col space-y-2 ml-4">
                             <Button
                               size="sm"
                               onClick={() =>
@@ -741,8 +765,8 @@ export default function AdminPanel() {
                             </Button>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
