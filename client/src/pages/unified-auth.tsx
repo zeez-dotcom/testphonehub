@@ -191,8 +191,8 @@ export default function UnifiedAuth() {
   };
 
   const handleAdminLogin = () => {
-    setLoginData({ email: "testadmin", password: "admin123" });
-    loginMutation.mutate({ email: "testadmin", password: "admin123" });
+    setLoginData({ email: "admin@phonehub.com", password: "admin123" });
+    loginMutation.mutate({ email: "admin@phonehub.com", password: "admin123" });
   };
 
   return (
@@ -297,7 +297,7 @@ export default function UnifiedAuth() {
                     onClick={handleAdminLogin}
                     disabled={loginMutation.isPending}
                   >
-                    Login as Admin (testadmin / admin123)
+                    Login as Admin (admin@phonehub.com / admin123)
                   </Button>
                 </div>
               </TabsContent>
