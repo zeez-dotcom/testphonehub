@@ -8,6 +8,7 @@ import { setupPassport, getConfiguredProviders } from "./auth";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
+import FileType from "file-type";
 import path from "path";
 import fs from "fs";
 import {
@@ -137,22 +138,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/uploads', express.static(uploadDir));
 
   // File upload route
-  app.post("/api/upload", requireAuth, upload.single('file'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  app.post("/api/upload", requireAuth, upload.array('file'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
+      const files = (req.files as Express.Multer.File[]) || [];
+      if (files.length === 0) {
+        return res.status(400).json({ message: "No files uploaded" });
       }
 
-      // Generate the URL for the uploaded file
-      const fileUrl = `/uploads/${req.file.filename}`;
-      
-      res.json({
-        url: fileUrl,
-        filename: req.file.filename,
-        originalname: req.file.originalname,
-        size: req.file.size,
-        mimetype: req.file.mimetype
-      });
+      const fileInfos = [] as any[];
+      for (const file of files) {
+        const buffer = await fs.promises.readFile(file.path);
+        const detected = await FileType.fromBuffer(buffer);
+        fileInfos.push({
+          url: `/uploads/${file.filename}`,
+          filename: file.filename,
+          originalname: file.originalname,
+          size: file.size,
+          mimetype: detected?.mime || file.mimetype,
+        });
+      }
+
+      res.json({ files: fileInfos });
     } catch (error) {
       console.error("Upload error:", error);
       res.status(500).json({ message: "Upload failed" });
