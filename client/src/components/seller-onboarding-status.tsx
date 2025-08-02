@@ -11,7 +11,7 @@ interface SellerOnboardingStatusProps {
 
 export function SellerOnboardingStatus({ sellerId }: SellerOnboardingStatusProps) {
   const { data: sellerProfile } = useQuery<any>({
-    queryKey: ["/api/seller/profile"],
+    queryKey: ["/api/sellers", "profile"],
   });
 
   const getStatusInfo = (status: string) => {

@@ -51,16 +51,16 @@ export default function SellerDocuments() {
 
   // Fetch seller data
   const { data: sellerData } = useQuery({
-    queryKey: ["/api/seller/profile"],
+    queryKey: ["/api/sellers", "profile"],
   });
 
   // Submit seller documents
   const submitDocuments = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return await apiRequest("PUT", "/api/seller/documents", data);
+      return await apiRequest("PUT", "/api/sellers/documents", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/seller/profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sellers", "profile"] });
       toast({ 
         title: "Documents submitted successfully",
         description: "Your documents are now under review by our admin team."
