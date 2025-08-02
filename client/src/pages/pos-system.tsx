@@ -71,27 +71,28 @@ export default function POSSystem() {
       }));
 
       // Create order
-      const order = await apiRequest("POST", "/api/orders", {
-        total: total.toString(),
-        isPosOrder: true,
-        items: orderItems,
-      });
+        const orderRes = await apiRequest("POST", "/api/orders", {
+          total: total.toString(),
+          isPosOrder: true,
+          items: orderItems,
+        });
+        const order = await orderRes.json();
 
-      // Process payment with metadata
-      const changeAmount = amountReceived ? amountReceived - total : 0;
-      await apiRequest("POST", "/api/payments", {
-        orderId: order.id,
-        amount: total.toString(),
-        method: paymentMethod,
-        metadata: {
-          amountReceived,
-          changeAmount: changeAmount > 0 ? changeAmount : 0,
-          customerName,
-          customerPhone,
-        },
-      });
+        // Process payment with metadata
+        const changeAmount = amountReceived ? amountReceived - total : 0;
+        await apiRequest("POST", "/api/payments", {
+          orderId: order.id,
+          amount: total.toString(),
+          method: paymentMethod,
+          metadata: {
+            amountReceived,
+            changeAmount: changeAmount > 0 ? changeAmount : 0,
+            customerName,
+            customerPhone,
+          },
+        });
 
-      return order;
+        return order;
     },
     onSuccess: async (order) => {
       // Fetch receipt data

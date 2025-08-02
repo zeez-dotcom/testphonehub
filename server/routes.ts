@@ -22,10 +22,11 @@ import {
 } from "@shared/schema";
 
 interface AuthenticatedRequest extends Request {
-  user?: {
-    userId: string;
-    userRole: string;
-  };
+  // Use a loose type for the authenticated user to maintain compatibility
+  // with Express' `Request` interface which defines `user` as `Express.User`.
+  // Specific properties like `userId` and `userRole` can be accessed via
+  // narrowing within route handlers as needed.
+  user?: any;
 }
 
 // JWT Authentication middleware
@@ -232,7 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      const isValidPassword = await bcrypt.compare(password, user.password);
+        const isValidPassword = await bcrypt.compare(password, user.password || "");
       if (!isValidPassword) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
@@ -893,15 +894,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.put("/api/admin/sellers/:id/reject-documents", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    try {
-      const sellerId = req.params.id;
-      const { rejectionReason } = req.body;
-      
-      const updatedSeller = await storage.updateSeller(sellerId, {
-        status: "rejected",
-        rejectionReason: rejectionReason,
-        updatedAt: new Date()
-      });
+      try {
+        const sellerId = req.params.id;
+        const { rejectionReason } = req.body;
+
+        const updatedSeller = await storage.updateSeller(sellerId, {
+          status: "rejected",
+          updatedAt: new Date()
+        });
 
       if (!updatedSeller) {
         return res.status(404).json({ message: "Seller not found" });
@@ -1252,12 +1252,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Seller not found" });
       }
 
-      // Update seller status to rejected
-      const updatedSeller = await storage.updateSeller(seller.sellerId, {
-        status: "rejected",
-        rejectionReason: rejectionReason,
-        updatedAt: new Date()
-      });
+        // Update seller status to rejected
+        const updatedSeller = await storage.updateSeller(seller.sellerId, {
+          status: "rejected",
+          updatedAt: new Date()
+        });
       
       res.json({ message: "Seller documents rejected", seller: updatedSeller });
     } catch (error) {

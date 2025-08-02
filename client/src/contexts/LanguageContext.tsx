@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getTranslation, formatCurrency, formatNumber, type TranslationKey } from '@shared/translations';
+import { getTranslation, formatCurrency, formatNumber } from '@shared/translations';
 
 type Language = 'en' | 'ar';
 
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: TranslationKey) => string;
+    t: (key: string) => string;
   formatCurrency: (amount: number | string) => string;
   formatNumber: (num: number) => string;
   isRTL: boolean;
@@ -37,7 +37,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
   }, [language]);
 
-  const t = (key: TranslationKey) => getTranslation(key, language);
+  const t = (key: string) => getTranslation(key as any, language);
   
   const currencyFormatter = (amount: number | string) => formatCurrency(amount, language);
   

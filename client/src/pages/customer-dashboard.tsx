@@ -6,31 +6,33 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { Package, ShoppingBag, Heart, User } from "lucide-react";
 import type { Order } from "@shared/schema";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
+  const { formatCurrency } = useLanguage();
 
   const { data: orders = [] } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
   });
 
-  const getStatusBadge = (status: string) => {
-    const statusMap = {
-      pending: { variant: "secondary" as const, text: "Pending" },
-      processing: { variant: "default" as const, text: "Processing" },
-      shipped: { variant: "outline" as const, text: "Shipped" },
-      delivered: { variant: "secondary" as const, text: "Delivered", className: "bg-green-100 text-green-800" },
-      cancelled: { variant: "destructive" as const, text: "Cancelled" },
-    };
+    const getStatusBadge = (status: string) => {
+      const statusMap: Record<string, { variant: "secondary" | "default" | "outline" | "destructive"; text: string; className?: string }> = {
+        pending: { variant: "secondary", text: "Pending" },
+        processing: { variant: "default", text: "Processing" },
+        shipped: { variant: "outline", text: "Shipped" },
+        delivered: { variant: "secondary", text: "Delivered", className: "bg-green-100 text-green-800" },
+        cancelled: { variant: "destructive", text: "Cancelled" },
+      };
 
-    const config = statusMap[status as keyof typeof statusMap] || statusMap.pending;
-    
-    return (
-      <Badge variant={config.variant} className={config.className}>
-        {config.text}
-      </Badge>
-    );
-  };
+      const config = statusMap[status] || statusMap.pending;
+
+      return (
+        <Badge variant={config.variant} className={config.className}>
+          {config.text}
+        </Badge>
+      );
+    };
 
   const formatDate = (date: string | Date) => {
     return new Date(date).toLocaleDateString();

@@ -14,9 +14,11 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ShoppingCart, CreditCard, Truck, Package, CheckCircle } from "lucide-react";
 import type { CartItem, Product } from "@shared/schema";
+import { useLanguage } from "@/contexts/LanguageContext";
 
-export default function Checkout() {
-  const { user, isAuthenticated } = useAuth();
+  export default function Checkout() {
+    const { user, isAuthenticated } = useAuth();
+    const { formatCurrency } = useLanguage();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -78,20 +80,21 @@ export default function Checkout() {
       const total = calculateTotal();
 
       // Create order
-      const order = await apiRequest("POST", "/api/orders", {
-        total: total.toString(),
-        shippingAddress,
-        items: orderItems,
-      });
+        const orderRes = await apiRequest("POST", "/api/orders", {
+          total: total.toString(),
+          shippingAddress,
+          items: orderItems,
+        });
+        const order = await orderRes.json();
 
-      // Process payment
-      await apiRequest("POST", "/api/payments", {
-        orderId: order.id,
-        amount: total.toString(),
-        method: paymentMethod,
-      });
+        // Process payment
+        await apiRequest("POST", "/api/payments", {
+          orderId: order.id,
+          amount: total.toString(),
+          method: paymentMethod,
+        });
 
-      return order;
+        return order;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cart"] });

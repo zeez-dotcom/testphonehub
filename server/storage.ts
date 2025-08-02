@@ -161,17 +161,17 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUser(userData: InsertUser): Promise<User> {
-    const hashedPassword = await bcrypt.hash(userData.password, 10);
-    const [user] = await db
-      .insert(users)
-      .values({
-        ...userData,
-        password: hashedPassword,
-      })
-      .returning();
-    return user;
-  }
+    async createUser(userData: InsertUser): Promise<User> {
+      const hashedPassword = await bcrypt.hash(userData.password ?? "", 10);
+      const [user] = await db
+        .insert(users)
+        .values({
+          ...userData,
+          password: hashedPassword,
+        })
+        .returning();
+      return user;
+    }
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(desc(users.createdAt));
@@ -203,34 +203,33 @@ export class DatabaseStorage implements IStorage {
 
   async getSellerByUserId(userId: string): Promise<any> {
     const [result] = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        role: users.role,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-        sellerId: sellers.id,
-        status: sellers.status,
-        businessName: sellers.businessName,
-        businessType: sellers.businessType,
-        location: sellers.location,
-        phoneNumber: sellers.phoneNumber,
-        shopLicenseNumber: sellers.shopLicenseNumber,
-        ownerCivilId: sellers.ownerCivilId,
-        businessAddress: sellers.businessAddress,
-        whatsappNumber: sellers.whatsappNumber,
-        // Document fields
-        businessLogo: sellers.businessLogo,
-        shopLicenseImage: sellers.shopLicenseImage,
-        ownerCivilIdImage: sellers.ownerCivilIdImage,
-        ownerPhoto: sellers.ownerPhoto,
-        rejectionReason: sellers.rejectionReason
-      })
-      .from(users)
-      .innerJoin(sellers, eq(users.id, sellers.userId))
-      .where(and(eq(users.id, userId), eq(users.role, "seller")));
+        .select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          role: users.role,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+          sellerId: sellers.id,
+          status: sellers.status,
+          businessName: sellers.businessName,
+          businessType: sellers.businessType,
+          location: sellers.location,
+          phoneNumber: sellers.phoneNumber,
+          shopLicenseNumber: sellers.shopLicenseNumber,
+          ownerCivilId: sellers.ownerCivilId,
+          businessAddress: sellers.businessAddress,
+          whatsappNumber: sellers.whatsappNumber,
+          // Document fields
+          businessLogo: sellers.businessLogo,
+          shopLicenseImage: sellers.shopLicenseImage,
+          ownerCivilIdImage: sellers.ownerCivilIdImage,
+          ownerPhoto: sellers.ownerPhoto
+        })
+        .from(users)
+        .innerJoin(sellers, eq(users.id, sellers.userId))
+        .where(and(eq(users.id, userId), eq(users.role, "seller")));
     
     return result || undefined;
   }
@@ -881,12 +880,12 @@ export class DatabaseStorage implements IStorage {
     const avgRating = productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length;
     
     await db
-      .update(products)
-      .set({ 
-        rating: parseFloat(avgRating.toFixed(1)),
-        reviewCount: productReviews.length,
-        updatedAt: new Date()
-      })
+        .update(products)
+        .set({
+          rating: avgRating.toFixed(1),
+          reviewCount: productReviews.length,
+          updatedAt: new Date()
+        })
       .where(eq(products.id, review.productId));
     
     return result;
