@@ -129,9 +129,11 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
         <h3 className="font-semibold text-slate-900 mb-1 line-clamp-2">
           {product.name}
         </h3>
-        <p className="text-sm text-muted-foreground mb-2">
-          by {product.brand}
-        </p>
+        {product.brand && (
+          <p className="text-sm text-muted-foreground mb-2">
+            by {product.brand}
+          </p>
+        )}
         
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">

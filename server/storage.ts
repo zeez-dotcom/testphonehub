@@ -2,6 +2,7 @@ import {
   users,
   sellers,
   products,
+  productImages,
   orders,
   cart,
   payments,
@@ -15,6 +16,8 @@ import {
   type InsertSeller,
   type Product,
   type InsertProduct,
+  type ProductImage,
+  type InsertProductImage,
   type Order,
   type InsertOrder,
   type CartItem,
@@ -66,6 +69,11 @@ export interface IStorage {
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: string, updates: Partial<Product>): Promise<Product>;
   deleteProduct(id: string): Promise<void>;
+
+  // Product image operations
+  createProductImage(image: InsertProductImage): Promise<ProductImage>;
+  listProductImages(productId: string): Promise<ProductImage[]>;
+  deleteProductImage(id: string): Promise<void>;
 
   // Cart operations
   getCartItems(userId: string): Promise<CartItem[]>;
@@ -497,6 +505,26 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProduct(id: string): Promise<void> {
     await db.delete(products).where(eq(products.id, id));
+  }
+
+  async createProductImage(image: InsertProductImage): Promise<ProductImage> {
+    const [result] = await db
+      .insert(productImages)
+      .values(image)
+      .returning();
+    return result;
+  }
+
+  async listProductImages(productId: string): Promise<ProductImage[]> {
+    return await db
+      .select()
+      .from(productImages)
+      .where(eq(productImages.productId, productId))
+      .orderBy(productImages.displayOrder, productImages.createdAt);
+  }
+
+  async deleteProductImage(id: string): Promise<void> {
+    await db.delete(productImages).where(eq(productImages.id, id));
   }
 
   // Cart operations

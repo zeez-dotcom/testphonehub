@@ -455,7 +455,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if the user owns this product
-      if (product.sellerId !== req.user!.userId) {
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller || product.sellerId !== seller.sellerId) {
         return res.status(403).json({ message: "Not authorized" });
       }
 
@@ -476,7 +477,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if the user owns this product
-      if (product.sellerId !== req.user!.userId) {
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller || product.sellerId !== seller.sellerId) {
         return res.status(403).json({ message: "Not authorized" });
       }
 
@@ -964,6 +966,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching product details:", error);
       res.status(500).json({ message: "Failed to fetch product details" });
+    }
+  });
+
+  // Product image routes
+  app.get("/api/products/:productId/images", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const images = await storage.listProductImages(req.params.productId);
+      res.json(images);
+    } catch (error) {
+      console.error("Get product images error:", error);
+      res.status(500).json({ message: "Failed to get product images" });
+    }
+  });
+
+  app.post("/api/products/:productId/images", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const product = await storage.getProduct(req.params.productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller || product.sellerId !== seller.sellerId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const images: string[] = req.body.images || [];
+      const created = [] as any[];
+      for (let i = 0; i < images.length; i++) {
+        const url = images[i];
+        const img = await storage.createProductImage({
+          productId: req.params.productId,
+          imageUrl: url,
+          fileName: path.basename(url),
+          isMain: i === 0,
+          displayOrder: i,
+        });
+        created.push(img);
+      }
+      res.json({ images: created });
+    } catch (error) {
+      console.error("Create product images error:", error);
+      res.status(500).json({ message: "Failed to add product images" });
+    }
+  });
+
+  app.delete("/api/products/:productId/images/:imageId", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const product = await storage.getProduct(req.params.productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller || product.sellerId !== seller.sellerId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const images = await storage.listProductImages(req.params.productId);
+      if (!images.find((img) => img.id === req.params.imageId)) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+
+      await storage.deleteProductImage(req.params.imageId);
+      res.json({ message: "Image deleted" });
+    } catch (error) {
+      console.error("Delete product image error:", error);
+      res.status(500).json({ message: "Failed to delete product image" });
     }
   });
 
