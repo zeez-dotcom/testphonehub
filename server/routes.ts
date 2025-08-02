@@ -2,6 +2,8 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import express from "express";
 import session from "express-session";
+import RedisStore from "connect-redis";
+import { createClient as createRedisClient } from "redis";
 import passport from "passport";
 import { storage } from "./storage";
 import { setupPassport, getConfiguredProviders } from "./auth";
@@ -122,8 +124,24 @@ function requireRole(role: string) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Session configuration for OAuth
+  // Session configuration for OAuth using Redis store when available
+  const redisUrl = process.env.REDIS_URL;
+  let sessionStore: session.Store | undefined;
+
+  if (redisUrl) {
+    const redisClient = createRedisClient({
+      url: redisUrl,
+      username: process.env.REDIS_USERNAME,
+      password: process.env.REDIS_PASSWORD,
+    });
+
+    redisClient.on("error", (err) => console.error("Redis Client Error", err));
+    await redisClient.connect();
+    sessionStore = new RedisStore({ client: redisClient });
+  }
+
   app.use(session({
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || 'phonehub-session-secret',
     resave: false,
     saveUninitialized: false,
