@@ -127,7 +127,7 @@ export default function AdminPanel() {
   });
 
   const { data: notifications = [], isLoading: notificationsLoading } =
-    useQuery({
+    useQuery<Notification[]>({
       queryKey: ["/api/notifications"],
     });
 

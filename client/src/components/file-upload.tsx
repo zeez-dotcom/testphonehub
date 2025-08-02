@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
-import { Upload, X, Image, FileText, Loader2 } from "lucide-react";
+import { Upload, X, Image as ImageIcon, FileText, Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 interface FileUploadProps {
@@ -256,7 +256,7 @@ export function FileUpload({
 
   const getFileIcon = (url: string) => {
     if (url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-      return <Image className="h-4 w-4" />;
+      return <ImageIcon className="h-4 w-4" />;
     }
     return <FileText className="h-4 w-4" />;
   };

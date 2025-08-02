@@ -43,7 +43,7 @@ export function setupPassport() {
           return done(null, false, { message: 'Invalid email or password' });
         }
 
-        const isValidPassword = await bcrypt.compare(password, user.password);
+          const isValidPassword = await bcrypt.compare(password, user.password || "");
         if (!isValidPassword) {
           return done(null, false, { message: 'Invalid email or password' });
         }
@@ -62,7 +62,7 @@ export function setupPassport() {
       clientSecret: GOOGLE_CLIENT_SECRET,
       callbackURL: "/api/auth/google/callback"
     },
-    async (accessToken, refreshToken, profile, done) => {
+      async (accessToken: any, refreshToken: any, profile: any, done: any) => {
       try {
         // Check if user already exists with Google ID
         let user = await storage.getUserByEmail(profile.emails?.[0]?.value || '');
@@ -107,7 +107,7 @@ export function setupPassport() {
       callbackURL: "/api/auth/apple/callback",
       scope: ['email', 'name']
     },
-    async (accessToken, refreshToken, profile, done) => {
+      async (accessToken: any, refreshToken: any, profile: any, done: any) => {
       try {
         const email = profile.email;
         if (!email) {
