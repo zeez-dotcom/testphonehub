@@ -8,7 +8,7 @@ import { setupPassport, getConfiguredProviders } from "./auth";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
-import FileType from "file-type";
+import { fileTypeFromBuffer } from "file-type";
 import path from "path";
 import fs from "fs";
 import {
@@ -148,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileInfos = [] as any[];
       for (const file of files) {
         const buffer = await fs.promises.readFile(file.path);
-        const detected = await FileType.fromBuffer(buffer);
+        const detected = await fileTypeFromBuffer(buffer);
         fileInfos.push({
           url: `/uploads/${file.filename}`,
           filename: file.filename,
