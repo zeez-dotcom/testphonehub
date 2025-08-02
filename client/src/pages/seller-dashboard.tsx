@@ -43,8 +43,9 @@ export default function SellerDashboard() {
     imageUrl: "",
     sku: "",
   });
-  
+
   const [productImages, setProductImages] = useState<string[]>([]);
+  const [imageIdMap, setImageIdMap] = useState<Record<string, string>>({});
 
   // For simplified implementation, the seller is the current user
   const seller = user;
@@ -78,17 +79,25 @@ export default function SellerDashboard() {
     mutationFn: async (data: typeof productForm) => {
       return await apiRequest("POST", "/api/products", data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      setIsAddProductOpen(false);
-      resetProductForm();
-      toast({ title: "Product created successfully" });
+    onSuccess: async (product: Product) => {
+      try {
+        if (productImages.length > 0) {
+          await apiRequest("POST", `/api/products/${product.id}/images`, {
+            images: productImages,
+          });
+        }
+      } finally {
+        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+        setIsAddProductOpen(false);
+        resetProductForm();
+        toast({ title: "Product created successfully" });
+      }
     },
     onError: (error) => {
-      toast({ 
-        title: "Failed to create product", 
+      toast({
+        title: "Failed to create product",
         description: error.message,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -97,17 +106,26 @@ export default function SellerDashboard() {
     mutationFn: async ({ id, data }: { id: string; data: typeof productForm }) => {
       return await apiRequest("PUT", `/api/products/${id}`, data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      setEditingProduct(null);
-      resetProductForm();
-      toast({ title: "Product updated successfully" });
+    onSuccess: async (product: Product) => {
+      try {
+        const newImages = productImages.filter((url) => !imageIdMap[url]);
+        if (newImages.length > 0) {
+          await apiRequest("POST", `/api/products/${product.id}/images`, {
+            images: newImages,
+          });
+        }
+      } finally {
+        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+        setEditingProduct(null);
+        resetProductForm();
+        toast({ title: "Product updated successfully" });
+      }
     },
     onError: (error) => {
-      toast({ 
-        title: "Failed to update product", 
+      toast({
+        title: "Failed to update product",
         description: error.message,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -143,6 +161,7 @@ export default function SellerDashboard() {
       sku: "",
     });
     setProductImages([]);
+    setImageIdMap({});
   };
 
   const handleProductSubmit = (e: React.FormEvent) => {
@@ -154,7 +173,7 @@ export default function SellerDashboard() {
     }
   };
 
-  const handleEditProduct = (product: Product) => {
+  const handleEditProduct = async (product: Product) => {
     setEditingProduct(product);
     setProductForm({
       name: product.name,
@@ -168,8 +187,16 @@ export default function SellerDashboard() {
       imageUrl: product.imageUrl || "",
       sku: product.sku || "",
     });
-    // Set existing product images
-    setProductImages(product.imageUrl ? [product.imageUrl] : []);
+    try {
+      const images: any[] = await apiRequest("GET", `/api/products/${product.id}/images`);
+      setProductImages(images.map((img) => img.imageUrl));
+      const map: Record<string, string> = {};
+      images.forEach((img) => (map[img.imageUrl] = img.id));
+      setImageIdMap(map);
+    } catch (err) {
+      console.error(err);
+      setProductImages(product.imageUrl ? [product.imageUrl] : []);
+    }
   };
 
   const getProductStatusBadge = (status: string) => {
@@ -476,12 +503,23 @@ export default function SellerDashboard() {
                                   setProductForm({...productForm, imageUrl: newImages[0]});
                                 }
                               }}
-                              onFileRemoved={(url) => {
+                              onFileRemoved={async (url) => {
                                 const updatedImages = productImages.filter(img => img !== url);
                                 setProductImages(updatedImages);
                                 // If removed image was the main image, set new main
                                 if (productForm.imageUrl === url) {
                                   setProductForm({...productForm, imageUrl: updatedImages[0] || ""});
+                                }
+                                const imageId = imageIdMap[url];
+                                if (imageId && editingProduct) {
+                                  try {
+                                    await apiRequest("DELETE", `/api/products/${editingProduct.id}/images/${imageId}`);
+                                  } catch (err) {
+                                    console.error(err);
+                                  }
+                                  const newMap = { ...imageIdMap };
+                                  delete newMap[url];
+                                  setImageIdMap(newMap);
                                 }
                               }}
                             />
