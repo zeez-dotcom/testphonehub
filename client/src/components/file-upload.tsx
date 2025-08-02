@@ -193,10 +193,14 @@ export function FileUpload({
         }
 
         const result = await response.json();
-        return result.url;
+        if (Array.isArray(result.files)) {
+          return result.files.map((f: any) => f.url);
+        }
+        return result.url ? [result.url] : [];
       });
 
-      const uploadedUrls = await Promise.all(uploadPromises);
+      const uploaded = await Promise.all(uploadPromises);
+      const uploadedUrls = uploaded.flat();
       onFilesUploaded(uploadedUrls);
 
       toast({
