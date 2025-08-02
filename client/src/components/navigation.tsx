@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { LanguageToggle } from "@/components/language-toggle";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -177,7 +178,7 @@ export function Navigation() {
   };
 
   return (
-    <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
+    <header className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo and Brand */}
@@ -206,6 +207,7 @@ export function Navigation() {
           <div className={`flex items-center ${isRTL ? 'space-x-reverse' : ''} space-x-4`}>
             {/* Language Toggle */}
             <LanguageToggle />
+            <ThemeToggle />
             {/* Cart */}
             {isAuthenticated && (
               <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
