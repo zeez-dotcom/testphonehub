@@ -33,7 +33,7 @@ Preferred communication style: Simple, everyday language.
 - **Language**: TypeScript with ES modules
 - **Database**: PostgreSQL with Neon serverless database
 - **ORM**: Drizzle ORM for type-safe database operations
-- **Session Management**: Express sessions with PostgreSQL store
+- **Session Management**: Express sessions with Redis store
 - **Authentication**: Session-based authentication with bcrypt password hashing
 
 ## Key Components
@@ -79,6 +79,9 @@ Logging in with this default account automatically sets up the admin role.
 Before running the server, set the required environment variables:
 
 - `JWT_SECRET`: Secret key for signing JSON Web Tokens. The server will fail to start if this variable is not provided.
+- `REDIS_URL`: Connection string for the Redis instance used to persist sessions.
+- `REDIS_USERNAME`: Username for authenticating with Redis (if required).
+- `REDIS_PASSWORD`: Password for authenticating with Redis.
 
 ## Data Flow
 
@@ -111,7 +114,7 @@ Before running the server, set the required environment variables:
 ### Database & Storage
 - **Neon Database**: Serverless PostgreSQL hosting
 - **Drizzle Kit**: Database migration and schema management
-- **connect-pg-simple**: PostgreSQL session store for Express
+- **connect-redis**: Redis session store for Express
 
 ### UI & Styling
 - **Radix UI**: Accessible component primitives
