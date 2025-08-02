@@ -390,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/products/seller", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  app.get("/api/sellers/products", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       // Get products for the current seller
       const seller = await storage.getSellerByUserId(req.user!.userId);
@@ -411,7 +411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get seller notifications
-  app.get("/api/seller/notifications", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  app.get("/api/sellers/notifications", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.getSellerByUserId(req.user!.userId);
       if (!seller) {
@@ -427,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mark seller notification as read
-  app.put("/api/seller/notifications/:id/read", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  app.put("/api/sellers/notifications/:id/read", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       await storage.markNotificationRead(req.params.id);
       res.json({ success: true });
@@ -595,7 +595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get seller orders with enhanced details
-  app.get("/api/orders/seller", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  app.get("/api/sellers/orders", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.getSellerByUserId(req.user!.userId);
       if (!seller) {
@@ -853,7 +853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get seller profile route
-  app.get("/api/seller/profile", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  app.get("/api/sellers/profile", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.getSellerByUserId(req.user!.userId);
       if (!seller) {
@@ -867,7 +867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Seller document submission route
-  app.put("/api/seller/documents", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  app.put("/api/sellers/documents", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.getSellerByUserId(req.user!.userId);
       if (!seller) {
@@ -1440,7 +1440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics routes
-  app.get("/api/analytics/seller/:id", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  app.get("/api/sellers/:id/analytics", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const seller = await storage.getSellerByUserId(req.user!.userId);
       if (!seller || (req.params.id !== seller.sellerId && req.user?.userRole !== "admin")) {
@@ -1550,6 +1550,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Update stock error:", error);
       res.status(500).json({ message: "Failed to update stock" });
     }
+  });
+
+  // Redirect deprecated seller routes to new /api/sellers prefix
+  app.use("/api/seller", (req, res) => {
+    res.redirect(308, req.originalUrl.replace(/^\/api\/seller/, "/api/sellers"));
+  });
+  app.use("/api/products/seller", (req, res) => {
+    res.redirect(308, req.originalUrl.replace(/^\/api\/products\/seller/, "/api/sellers/products"));
+  });
+  app.use("/api/orders/seller", (req, res) => {
+    res.redirect(308, req.originalUrl.replace(/^\/api\/orders\/seller/, "/api/sellers/orders"));
+  });
+  app.get("/api/analytics/seller/:id", (req, res) => {
+    res.redirect(308, `/api/sellers/${req.params.id}/analytics`);
   });
 
   const httpServer = createServer(app);

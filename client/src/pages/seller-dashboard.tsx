@@ -77,25 +77,25 @@ export default function SellerDashboard() {
 
   // Fetch seller stats
   const { data: stats } = useQuery({
-    queryKey: ["/api/analytics/seller", seller?.id],
+    queryKey: ["/api/sellers", seller?.id, "analytics"],
     enabled: !!seller?.id,
   });
 
   // Fetch seller products
   const { data: products = [] } = useQuery<Product[]>({
-    queryKey: ["/api/products/seller"],
+    queryKey: ["/api/sellers", "products"],
     enabled: !!seller?.id,
   });
 
   // Fetch seller orders
   const { data: orders = [] } = useQuery<Order[]>({
-    queryKey: ["/api/orders/seller"],
+    queryKey: ["/api/sellers", "orders"],
     enabled: !!seller?.id,
   });
 
   // Fetch seller notifications
   const { data: notifications = [] } = useQuery({
-    queryKey: ["/api/seller/notifications"],
+    queryKey: ["/api/sellers", "notifications"],
     enabled: !!seller?.id,
   });
 
