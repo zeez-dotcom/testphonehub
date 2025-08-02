@@ -20,14 +20,7 @@ import {
   insertPaymentSchema,
   insertReviewSchema,
 } from "@shared/schema";
-
-interface AuthenticatedRequest extends Request {
-  // Use a loose type for the authenticated user to maintain compatibility
-  // with Express' `Request` interface which defines `user` as `Express.User`.
-  // Specific properties like `userId` and `userRole` can be accessed via
-  // narrowing within route handlers as needed.
-  user?: any;
-}
+import type { AuthenticatedRequest, AuthenticatedUser } from "./types";
 
 // JWT Authentication middleware
 const JWT_SECRET = process.env.JWT_SECRET || "phonehub-jwt-secret-key-2024";
@@ -76,11 +69,11 @@ function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextF
     return res.status(401).json({ message: "Access token required" });
   }
 
-  jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
       return res.status(403).json({ message: "Invalid token" });
     }
-    req.user = decoded as { userId: string; userRole: string };
+    req.user = decoded as AuthenticatedUser;
     next();
   });
 }
@@ -99,12 +92,12 @@ function requireRole(role: string) {
       return res.status(401).json({ message: "Access token required" });
     }
 
-    jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
       if (err) {
         return res.status(403).json({ message: "Invalid token" });
       }
-      req.user = decoded as { userId: string; userRole: string };
-      
+      req.user = decoded as AuthenticatedUser;
+
       if (req.user.userRole !== role) {
         return res.status(403).json({ message: "Insufficient permissions" });
       }
