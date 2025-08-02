@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigation } from "@/components/navigation";
 import { SellerOnboardingStatus } from "@/components/seller-onboarding-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,8 +47,33 @@ export default function SellerDashboard() {
   const [productImages, setProductImages] = useState<string[]>([]);
   const [imageIdMap, setImageIdMap] = useState<Record<string, string>>({});
 
+  const [documents, setDocuments] = useState({
+    businessLogo: [] as string[],
+    shopLicenseImage: [] as string[],
+    ownerCivilIdImage: [] as string[],
+    ownerPhoto: [] as string[],
+  });
+
   // For simplified implementation, the seller is the current user
   const seller = user;
+
+  useEffect(() => {
+    if (!seller?.id) return;
+    (async () => {
+      try {
+        const res = await apiRequest("GET", "/api/seller/documents");
+        const data = await res.json();
+        setDocuments({
+          businessLogo: data.businessLogo ? [data.businessLogo] : [],
+          shopLicenseImage: data.shopLicenseImage ? [data.shopLicenseImage] : [],
+          ownerCivilIdImage: data.ownerCivilIdImage ? [data.ownerCivilIdImage] : [],
+          ownerPhoto: data.ownerPhoto ? [data.ownerPhoto] : [],
+        });
+      } catch (err) {
+        console.error("Failed to fetch seller documents:", err);
+      }
+    })();
+  }, [seller?.id]);
 
   // Fetch seller stats
   const { data: stats } = useQuery({
@@ -196,6 +221,50 @@ export default function SellerDashboard() {
     } catch (err) {
       console.error(err);
       setProductImages(product.imageUrl ? [product.imageUrl] : []);
+    }
+  };
+
+  const toRequestBody = (docs: typeof documents) => ({
+    businessLogo: docs.businessLogo[0] || "",
+    shopLicenseImage: docs.shopLicenseImage[0] || "",
+    ownerCivilIdImage: docs.ownerCivilIdImage[0] || "",
+    ownerPhoto: docs.ownerPhoto[0] || "",
+  });
+
+  const handleDocumentUpload = async (
+    field: keyof typeof documents,
+    urls: string[],
+  ) => {
+    const updated = { ...documents, [field]: urls };
+    setDocuments(updated);
+    try {
+      await apiRequest("PUT", "/api/seller/documents", toRequestBody(updated));
+    } catch (error: any) {
+      toast({
+        title: "Failed to upload document",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDocumentRemove = async (
+    field: keyof typeof documents,
+    url: string,
+  ) => {
+    const updated = {
+      ...documents,
+      [field]: documents[field].filter((u) => u !== url),
+    };
+    setDocuments(updated);
+    try {
+      await apiRequest("PUT", "/api/seller/documents", toRequestBody(updated));
+    } catch (error: any) {
+      toast({
+        title: "Failed to remove document",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -953,8 +1022,9 @@ export default function SellerDashboard() {
                           accept="image/*"
                           multiple={false}
                           maxFiles={1}
-                          currentFiles={[]}
-                          onFilesUploaded={(urls) => console.log("Logo uploaded:", urls)}
+                          currentFiles={documents.businessLogo}
+                          onFilesUploaded={(urls) => handleDocumentUpload("businessLogo", urls)}
+                          onFileRemoved={(url) => handleDocumentRemove("businessLogo", url)}
                         />
                       </div>
                     </CardContent>
@@ -1019,26 +1089,29 @@ export default function SellerDashboard() {
                           accept="image/*,application/pdf"
                           multiple={false}
                           maxFiles={1}
-                          currentFiles={[]}
-                          onFilesUploaded={(urls) => console.log("License uploaded:", urls)}
+                          currentFiles={documents.shopLicenseImage}
+                          onFilesUploaded={(urls) => handleDocumentUpload("shopLicenseImage", urls)}
+                          onFileRemoved={(url) => handleDocumentRemove("shopLicenseImage", url)}
                         />
-                        
+
                         <FileUpload
                           label={t("civil_id")}
                           accept="image/*,application/pdf"
                           multiple={false}
                           maxFiles={1}
-                          currentFiles={[]}
-                          onFilesUploaded={(urls) => console.log("Civil ID uploaded:", urls)}
+                          currentFiles={documents.ownerCivilIdImage}
+                          onFilesUploaded={(urls) => handleDocumentUpload("ownerCivilIdImage", urls)}
+                          onFileRemoved={(url) => handleDocumentRemove("ownerCivilIdImage", url)}
                         />
-                        
+
                         <FileUpload
                           label={t("owner_photo")}
                           accept="image/*"
                           multiple={false}
                           maxFiles={1}
-                          currentFiles={[]}
-                          onFilesUploaded={(urls) => console.log("Owner photo uploaded:", urls)}
+                          currentFiles={documents.ownerPhoto}
+                          onFilesUploaded={(urls) => handleDocumentUpload("ownerPhoto", urls)}
+                          onFileRemoved={(url) => handleDocumentRemove("ownerPhoto", url)}
                         />
                       </div>
                     </CardContent>
