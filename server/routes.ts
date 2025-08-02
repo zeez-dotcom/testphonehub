@@ -38,35 +38,46 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+const fileFilter: multer.Options['fileFilter'] = (req, file, cb) => {
+  // Allow all common file types for seller documents
+  const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|doc|docx|txt|bmp|svg|tiff|tif/;
+  const allowedMimeTypes = /image\/.*|application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|text\/plain/;
+
+  const ext = path.extname(file.originalname).toLowerCase();
+  const extname = allowedTypes.test(ext);
+  const mimetype = allowedMimeTypes.test(file.mimetype);
+
+  if (mimetype && extname) {
+    return cb(null, true);
+  }
+
+  console.log(
+    `File rejected due to mismatched MIME type or extension: ${file.originalname}, MIME type: ${file.mimetype}, extension: ${ext}`
+  );
+  cb(
+    new Error(
+      `File type not supported or mismatched. Received MIME type: ${file.mimetype} and extension: ${ext}. Please upload images (JPG, PNG, GIF, WebP, BMP, TIFF) or documents (PDF, DOC, DOCX, TXT).`
+    )
+  );
+};
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
       cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
       cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
+    },
   }),
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
-  fileFilter: (req, file, cb) => {
-    // Allow all common file types for seller documents
-    const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|doc|docx|txt|bmp|svg|tiff|tif/;
-    const allowedMimeTypes = /image\/.*|application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|text\/plain/;
-    
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedMimeTypes.test(file.mimetype);
-    
-    if (mimetype || extname) {
-      return cb(null, true);
-    } else {
-      console.log('File rejected:', file.originalname, file.mimetype);
-      cb(new Error(`File type not supported. Received: ${file.mimetype}. Please upload images (JPG, PNG, GIF, WebP, BMP, TIFF) or documents (PDF, DOC, DOCX, TXT).`));
-    }
-  }
+  fileFilter,
 });
+
+export { fileFilter };
 
 function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
