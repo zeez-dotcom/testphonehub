@@ -594,28 +594,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/orders", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      // Get cart items to check stock
-      const cartItems = await storage.getCartItems(req.user!.userId);
-      if (cartItems.length === 0) {
-        return res.status(400).json({ message: "Cart is empty" });
+      const isPosOrder = req.body.isPosOrder;
+
+      // Use provided items for POS orders, otherwise fetch cart items
+      const items = isPosOrder
+        ? (req.body.items || [])
+        : await storage.getCartItems(req.user!.userId);
+
+      if (items.length === 0) {
+        return res.status(400).json({ message: isPosOrder ? "No items provided" : "Cart is empty" });
       }
 
       // Check stock availability
-      for (const item of cartItems) {
+      for (const item of items) {
         const product = await storage.getProduct(item.productId);
         if (!product) {
           return res.status(400).json({ message: `Product ${item.productId} not found` });
         }
         if (product.stock < item.quantity) {
-          return res.status(400).json({ 
-            message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}` 
+          return res.status(400).json({
+            message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`
           });
         }
       }
 
       // Calculate total - get price from product since cart item doesn't have price
       let total = 0;
-      for (const item of cartItems) {
+      for (const item of items) {
         const product = await storage.getProduct(item.productId);
         if (product) {
           total += parseFloat(product.price) * item.quantity;
@@ -623,22 +628,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get seller ID from first product (single-vendor cart for now)
-      const firstProduct = await storage.getProduct(cartItems[0].productId);
-      
+      const firstProduct = await storage.getProduct(items[0].productId);
+
       const orderData = insertOrderSchema.parse({
+        ...req.body,
         customerId: req.user!.userId,
         sellerId: firstProduct?.sellerId || "",
         total: total.toString(),
         status: "pending",
         paymentStatus: "pending",
-        items: cartItems,
-        ...req.body,
+        items,
       });
 
       const order = await storage.createOrder(orderData);
 
       // Update inventory for each item
-      for (const item of cartItems) {
+      for (const item of items) {
         await storage.updateProductStock(item.productId, -item.quantity, "Sale", order.id);
       }
 
