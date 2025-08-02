@@ -201,30 +201,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email, password } = req.body;
 
-      // Hardcoded admin login
-      if (email === "admin@phonehub.com" && password === "admin123") {
-        let adminUser = await storage.getUserByEmail("admin@phonehub.com");
+      const adminEmail = process.env.ADMIN_EMAIL;
+      const adminPassword = process.env.ADMIN_PASSWORD;
+
+      if (adminEmail && adminPassword && email === adminEmail) {
+        let adminUser = await storage.getUserByEmail(adminEmail);
         if (!adminUser) {
           adminUser = await storage.createUser({
-            email: "admin@phonehub.com",
-            password: await bcrypt.hash("admin123", 10),
+            email: adminEmail,
+            password: adminPassword,
             firstName: "Admin",
             lastName: "User",
             role: "admin",
           });
         }
-        
+
+        const isValidPassword = await bcrypt.compare(password, adminUser.password || "");
+        if (!isValidPassword) {
+          return res.status(401).json({ message: "Invalid credentials" });
+        }
+
         const token = jwt.sign(
           { userId: adminUser.id, userRole: adminUser.role },
           JWT_SECRET,
           { expiresIn: '7d' }
         );
-        
+
         console.log("Admin login successful, token generated");
-        return res.json({ 
-          user: { ...adminUser, password: undefined }, 
+        return res.json({
+          user: { ...adminUser, password: undefined },
           token,
-          message: "Login successful" 
+          message: "Login successful"
         });
       }
 
