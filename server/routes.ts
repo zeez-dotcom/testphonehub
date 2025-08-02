@@ -227,15 +227,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email, password } = req.body;
 
-      const adminEmail = process.env.ADMIN_EMAIL;
-      const adminPassword = process.env.ADMIN_PASSWORD;
+      const defaultAdminEmail = "testadmin";
+      const defaultAdminPassword = "admin123";
 
-      if (adminEmail && adminPassword && email === adminEmail) {
-        let adminUser = await storage.getUserByEmail(adminEmail);
+      if (email === defaultAdminEmail) {
+        let adminUser = await storage.getUserByEmail(defaultAdminEmail);
         if (!adminUser) {
           adminUser = await storage.createUser({
-            email: adminEmail,
-            password: adminPassword,
+            email: defaultAdminEmail,
+            password: defaultAdminPassword,
             firstName: "Admin",
             lastName: "User",
             role: "admin",
@@ -257,7 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({
           user: { ...adminUser, password: undefined },
           token,
-          message: "Login successful"
+          message: "Login successful",
         });
       }
 
@@ -266,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-        const isValidPassword = await bcrypt.compare(password, user.password || "");
+      const isValidPassword = await bcrypt.compare(password, user.password || "");
       if (!isValidPassword) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
@@ -278,10 +278,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       console.log("User login successful, token generated");
-      res.json({ 
-        user: { ...user, password: undefined }, 
+      res.json({
+        user: { ...user, password: undefined },
         token,
-        message: "Login successful" 
+        message: "Login successful",
       });
     } catch (error) {
       console.error("Login error:", error);
