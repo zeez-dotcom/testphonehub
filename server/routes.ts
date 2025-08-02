@@ -195,7 +195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { email, password } = req.body;
 
       // Hardcoded admin login
-      if (email === "testadmin" && password === "admin123") {
+      if (email === "admin@phonehub.com" && password === "admin123") {
         let adminUser = await storage.getUserByEmail("admin@phonehub.com");
         if (!adminUser) {
           adminUser = await storage.createUser({
@@ -1194,6 +1194,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/sellers/:userId/upload-document", requireRole("admin"), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { field, fileUrl } = req.body;
+
+      if (!field || !fileUrl) {
+        return res.status(400).json({ message: "Field and fileUrl are required" });
+      }
       
       // Get seller profile to update
       const seller = await storage.getSellerByUserId(req.params.userId);
@@ -1242,6 +1246,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (businessAddress !== undefined) updateData.businessAddress = businessAddress;
       if (shopLicenseNumber !== undefined) updateData.shopLicenseNumber = shopLicenseNumber;
       if (ownerCivilId !== undefined) updateData.ownerCivilId = ownerCivilId;
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "No valid fields provided" });
+      }
       
       console.log("Updating seller with data:", updateData);
       console.log("Seller ID to update:", seller.sellerId);
