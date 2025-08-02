@@ -112,8 +112,6 @@ describe('marketplace flows', () => {
   let customerId: string;
 
   beforeAll(async () => {
-    process.env.ADMIN_EMAIL = 'admin@example.com';
-    process.env.ADMIN_PASSWORD = 'adminpass';
     process.env.JWT_SECRET = 'testsecret';
     ({ registerRoutes } = await import('../routes'));
     ({ storage } = await import('../storage'));
@@ -156,7 +154,7 @@ describe('marketplace flows', () => {
   it('admin login and seller approval lifecycle', async () => {
     const loginRes = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'admin@example.com', password: 'adminpass' });
+      .send({ email: 'testadmin', password: 'admin123' });
     expect(loginRes.status).toBe(200);
     const token = loginRes.body.token;
 
@@ -171,7 +169,7 @@ describe('marketplace flows', () => {
   it('seller product creation and order processing', async () => {
     const adminToken = (await request(app)
       .post('/api/auth/login')
-      .send({ email: 'admin@example.com', password: 'adminpass' })).body.token;
+      .send({ email: 'testadmin', password: 'admin123' })).body.token;
     await request(app)
       .put(`/api/sellers/${sellerId}/approve`)
       .set('Authorization', `Bearer ${adminToken}`);
@@ -225,7 +223,7 @@ describe('marketplace flows', () => {
   it('customer checkout flow', async () => {
     const adminToken = (await request(app)
       .post('/api/auth/login')
-      .send({ email: 'admin@example.com', password: 'adminpass' })).body.token;
+      .send({ email: 'testadmin', password: 'admin123' })).body.token;
     await request(app)
       .put(`/api/sellers/${sellerId}/approve`)
       .set('Authorization', `Bearer ${adminToken}`);

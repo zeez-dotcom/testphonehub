@@ -26,8 +26,6 @@ describe('admin login', () => {
 
   beforeAll(async () => {
     process.env.JWT_SECRET = 'testsecret';
-    process.env.ADMIN_EMAIL = 'admin@example.com';
-    process.env.ADMIN_PASSWORD = 'secret';
     ({ registerRoutes } = await import('../routes'));
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
@@ -41,10 +39,10 @@ describe('admin login', () => {
   it('logs in with valid admin credentials', async () => {
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'admin@example.com', password: 'secret' });
+      .send({ email: 'testadmin', password: 'admin123' });
 
     expect(res.status).toBe(200);
-    expect(res.body.user.email).toBe('admin@example.com');
+    expect(res.body.user.email).toBe('testadmin');
     expect(res.body.user.role).toBe('admin');
     expect(res.body.token).toBeDefined();
   });
@@ -52,7 +50,7 @@ describe('admin login', () => {
   it('rejects invalid admin credentials', async () => {
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'admin@example.com', password: 'wrong' });
+      .send({ email: 'testadmin', password: 'wrong' });
 
     expect(res.status).toBe(401);
   });
