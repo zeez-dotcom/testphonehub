@@ -74,6 +74,12 @@ password: admin123
 
 Logging in with this default account automatically sets up the admin role.
 
+## Setup Instructions
+
+Before running the server, set the required environment variables:
+
+- `JWT_SECRET`: Secret key for signing JSON Web Tokens. The server will fail to start if this variable is not provided.
+
 ## Data Flow
 
 ### Authentication Flow
