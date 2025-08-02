@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { DollarSign, Package, Clock, Star, Plus, Edit, Trash2, BarChart3, Bell, CheckCircle, XCircle, AlertCircle, ShoppingCart } from "lucide-react";
+import { Coins, Package, Clock, Star, Plus, Edit, Trash2, BarChart3, Bell, CheckCircle, XCircle, AlertCircle, ShoppingCart } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { FileUpload } from "@/components/file-upload";
 import type { Product, Order, Seller } from "@shared/schema";
@@ -263,11 +263,11 @@ export default function SellerDashboard() {
                 <div>
                   <p className="text-sm text-slate-600">Total Sales</p>
                   <p className="text-2xl font-bold text-slate-900">
-                    ${stats?.totalSales || "0"}
+                    {formatCurrency(parseFloat(stats?.totalSales || "0"))}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
-                  <DollarSign className="h-6 w-6 text-secondary" />
+                  <Coins className="h-6 w-6 text-secondary" />
                 </div>
               </div>
             </CardContent>
@@ -731,7 +731,7 @@ export default function SellerDashboard() {
                               <div className="flex items-center gap-2">
                                 {order.isPosOrder ? (
                                   <>
-                                    <DollarSign className="h-4 w-4 text-green-600" />
+                                    <Coins className="h-4 w-4 text-green-600" />
                                     <span className="text-sm font-medium">Cash (POS)</span>
                                   </>
                                 ) : (
@@ -808,7 +808,7 @@ export default function SellerDashboard() {
                               {stats ? formatCurrency(stats.totalSales) : formatCurrency(0)}
                             </p>
                           </div>
-                          <DollarSign className="h-8 w-8 text-green-600" />
+                          <Coins className="h-8 w-8 text-green-600" />
                         </div>
                       </CardContent>
                     </Card>

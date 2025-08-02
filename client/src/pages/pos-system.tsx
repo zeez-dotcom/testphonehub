@@ -11,7 +11,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Search, Plus, Minus, Trash2, CreditCard, DollarSign, Package, Receipt as ReceiptIcon } from "lucide-react";
+import { Search, Plus, Minus, Trash2, CreditCard, Coins, Package, Receipt as ReceiptIcon } from "lucide-react";
 import type { Product, Order } from "@shared/schema";
 
 interface POSCartItem {
@@ -383,7 +383,7 @@ export default function POSSystem() {
                     onClick={() => processPayment("cash")}
                     disabled={createPOSOrderMutation.isPending || posCart.length === 0}
                   >
-                    <DollarSign className="h-4 w-4 mr-2" />
+                    <Coins className="h-4 w-4 mr-2" />
                     {t('cash_payment')}
                   </Button>
                   <Button 

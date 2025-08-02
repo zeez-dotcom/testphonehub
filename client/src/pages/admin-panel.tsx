@@ -27,7 +27,7 @@ import {
   Users,
   ShoppingBag,
   TrendingUp,
-  DollarSign,
+  Coins,
   Eye,
   Settings,
   AlertCircle,
@@ -491,7 +491,7 @@ export default function AdminPanel() {
                           )}
                         </p>
                       </div>
-                      <DollarSign className="h-8 w-8 text-green-600" />
+                      <Coins className="h-8 w-8 text-green-600" />
                     </div>
                   </CardContent>
                 </Card>
