@@ -30,7 +30,11 @@ interface AuthenticatedRequest extends Request {
 }
 
 // JWT Authentication middleware
-const JWT_SECRET = process.env.JWT_SECRET || "phonehub-jwt-secret-key-2024";
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  throw new Error("JWT_SECRET environment variable is required");
+}
+const JWT_SECRET = jwtSecret;
 
 // File upload configuration
 const uploadDir = path.join(process.cwd(), 'uploads');
