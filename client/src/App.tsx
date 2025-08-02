@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
 import Marketplace from "@/pages/marketplace";
 import ProductDetails from "@/pages/product-details";
@@ -18,7 +19,7 @@ import POSSystem from "@/pages/pos-system";
 import Checkout from "@/pages/checkout";
 
 function Router() {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -37,40 +38,14 @@ function Router() {
       
       {/* Auth route */}
       <Route path="/auth" component={UnifiedAuth} />
-      
+
       {/* Protected routes */}
-      {isAuthenticated && (
-        <>
-          {/* Customer routes */}
-          {user?.role === "customer" && (
-            <>
-              <Route path="/customer-dashboard" component={CustomerDashboard} />
-              <Route path="/checkout" component={Checkout} />
-            </>
-          )}
-          
-          {/* Seller routes */}
-          {user?.role === "seller" && (
-            <>
-              <Route path="/seller-dashboard" component={SellerDashboard} />
-              <Route path="/seller-documents" component={SellerDocuments} />
-              <Route path="/pos-system" component={POSSystem} />
-              <Route path="/checkout" component={Checkout} />
-            </>
-          )}
-          
-          {/* Admin routes */}
-          {user?.role === "admin" && (
-            <>
-              <Route path="/admin-panel" component={AdminPanel} />
-              <Route path="/seller-dashboard" component={SellerDashboard} />
-              <Route path="/customer-dashboard" component={CustomerDashboard} />
-              <Route path="/pos-system" component={POSSystem} />
-              <Route path="/checkout" component={Checkout} />
-            </>
-          )}
-        </>
-      )}
+      <ProtectedRoute path="/customer-dashboard" component={CustomerDashboard} roles={["customer", "admin"]} />
+      <ProtectedRoute path="/seller-dashboard" component={SellerDashboard} roles={["seller", "admin"]} />
+      <ProtectedRoute path="/seller-documents" component={SellerDocuments} roles={["seller"]} />
+      <ProtectedRoute path="/admin-panel" component={AdminPanel} roles={["admin"]} />
+      <ProtectedRoute path="/pos-system" component={POSSystem} roles={["seller", "admin"]} />
+      <ProtectedRoute path="/checkout" component={Checkout} roles={["customer", "seller", "admin"]} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />
