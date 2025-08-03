@@ -45,6 +45,12 @@ export default function Marketplace() {
   const [sortBy, setSortBy] = useState("featured");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productModalOpen, setProductModalOpen] = useState(false);
+  const [wishlist, setWishlist] = useState<string[]>(() => {
+    const stored = localStorage.getItem("wishlist");
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  const isWishlisted = selectedProduct ? wishlist.includes(selectedProduct.id) : false;
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ["/api/products", filters],
@@ -108,6 +114,27 @@ export default function Marketplace() {
       maxPrice: "",
       condition: "all",
       search: "",
+    });
+  };
+
+  const handleApplyFilters = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+  };
+
+  const handleWishlistToggle = (productId: string) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save items to your wishlist.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setWishlist(prev => {
+      const exists = prev.includes(productId);
+      const updated = exists ? prev.filter(id => id !== productId) : [...prev, productId];
+      localStorage.setItem("wishlist", JSON.stringify(updated));
+      return updated;
     });
   };
 
@@ -270,8 +297,8 @@ placeholder={t("max_price")}
                     </Select>
                   </div>
 
-                  <Button className="w-full">
-{t("apply_filters")}
+                  <Button className="w-full" onClick={handleApplyFilters}>
+                    {t("apply_filters")}
                   </Button>
                 </CardContent>
               </Card>
@@ -514,8 +541,17 @@ placeholder={t("max_price")}
                           : t("add_to_cart")
                         }
                       </Button>
-                      <Button variant="outline" size="lg" className="px-6">
-                        <Heart className="h-5 w-5" />
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="px-6"
+                        onClick={() => handleWishlistToggle(selectedProduct.id)}
+                      >
+                        <Heart
+                          className={`h-5 w-5 ${
+                            isWishlisted ? "fill-red-500 text-red-500" : ""
+                          }`}
+                        />
                       </Button>
                     </div>
 
