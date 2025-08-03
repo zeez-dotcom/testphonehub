@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Navigation } from "@/components/navigation";
 import {
   Card,
@@ -91,6 +92,7 @@ export default function AdminPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { formatCurrency, t } = useLanguage();
+  const [, setLocation] = useLocation();
 
   // State management
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -347,6 +349,25 @@ export default function AdminPanel() {
     onError: (error) => {
       toast({
         title: "Failed to update seller details",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const markShippedMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      return await apiRequest("PUT", `/api/orders/${orderId}`, {
+        status: "shipped",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Order marked as shipped" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update order",
         description: error.message,
         variant: "destructive",
       });
@@ -839,7 +860,11 @@ export default function AdminPanel() {
                               </span>
                             </div>
                           </div>
-                          <Button size="sm" variant="outline">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setLocation(`/admin/users/${user.id}`)}
+                          >
                             <Eye className="h-4 w-4 mr-1" />
                             View Details
                           </Button>
@@ -919,7 +944,14 @@ export default function AdminPanel() {
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 Approve
                               </Button>
-                              <Button size="sm" variant="outline">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedSeller(seller.id);
+                                  setActiveTab("seller-documents");
+                                }}
+                              >
                                 <Eye className="h-3 w-3 mr-1" />
                                 Review
                               </Button>
@@ -1365,11 +1397,8 @@ export default function AdminPanel() {
                         </div>
                         <Button
                           size="sm"
-                          onClick={() =>
-                            apiRequest("PUT", `/api/orders/${order.id}`, {
-                              status: "shipped",
-                            })
-                          }
+                          onClick={() => markShippedMutation.mutate(order.id)}
+                          disabled={markShippedMutation.isPending}
                         >
                           Mark Shipped
                         </Button>
