@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { Package, ShoppingBag, Heart, User } from "lucide-react";
+import { Package, ShoppingBag, Heart, User, Star } from "lucide-react";
 import type { Order } from "@shared/schema";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useLocation } from "wouter";
@@ -154,6 +154,14 @@ export default function CustomerDashboard() {
                 >
                   <Heart className="h-4 w-4 mr-2" />
                   View Wishlist
+                </Button>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => setLocation("/loyalty")}
+                >
+                  <Star className="h-4 w-4 mr-2" />
+                  Loyalty Points
                 </Button>
                 <Button
                   className="w-full"

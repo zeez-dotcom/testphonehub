@@ -11,6 +11,7 @@ import {
   reviews,
   inventoryLogs,
   messages,
+  loyaltyTransactions,
   type User,
   type InsertUser,
   type Seller,
@@ -25,6 +26,7 @@ import {
   type InsertCartItem,
   type Payment,
   type InsertPayment,
+  type LoyaltyTransaction,
   type Review,
   type InsertReview,
   type InventoryLog,
@@ -102,6 +104,12 @@ export interface IStorage {
   getAllPayments(): Promise<Payment[]>;
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: string, updates: Partial<Payment>): Promise<Payment>;
+
+  // Loyalty operations
+  getLoyaltyBalance(userId: string): Promise<number>;
+  getLoyaltyTransactions(userId: string): Promise<LoyaltyTransaction[]>;
+  creditLoyaltyPoints(userId: string, points: number, description?: string): Promise<void>;
+  redeemLoyaltyPoints(userId: string, points: number, description?: string): Promise<void>;
 
   // Notification operations
   createNotification(notification: {
@@ -677,6 +685,77 @@ export class DatabaseStorage implements IStorage {
       .where(eq(payments.id, id))
       .returning();
     return payment;
+  }
+
+  // Loyalty operations
+  async getLoyaltyBalance(userId: string): Promise<number> {
+    const [user] = await db
+      .select({ loyaltyPoints: users.loyaltyPoints })
+      .from(users)
+      .where(eq(users.id, userId));
+    return user?.loyaltyPoints || 0;
+  }
+
+  async getLoyaltyTransactions(userId: string): Promise<LoyaltyTransaction[]> {
+    return await db
+      .select()
+      .from(loyaltyTransactions)
+      .where(eq(loyaltyTransactions.userId, userId))
+      .orderBy(desc(loyaltyTransactions.createdAt));
+  }
+
+  async creditLoyaltyPoints(
+    userId: string,
+    points: number,
+    description = "Order reward",
+  ): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({
+          loyaltyPoints: sql`${users.loyaltyPoints} + ${points}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+
+      await tx.insert(loyaltyTransactions).values({
+        userId,
+        points,
+        type: "credit",
+        description,
+      });
+    });
+  }
+
+  async redeemLoyaltyPoints(
+    userId: string,
+    points: number,
+    description = "Redeemed at checkout",
+  ): Promise<void> {
+    await db.transaction(async (tx) => {
+      const [user] = await tx
+        .select({ loyaltyPoints: users.loyaltyPoints })
+        .from(users)
+        .where(eq(users.id, userId));
+      if (!user || user.loyaltyPoints < points) {
+        throw new Error("Insufficient points");
+      }
+
+      await tx
+        .update(users)
+        .set({
+          loyaltyPoints: sql`${users.loyaltyPoints} - ${points}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+
+      await tx.insert(loyaltyTransactions).values({
+        userId,
+        points: -points,
+        type: "redeem",
+        description,
+      });
+    });
   }
 
   // Analytics

@@ -17,11 +17,17 @@ import type { CartItem, Product } from "@shared/schema";
 import { useLanguage } from "@/contexts/LanguageContext";
 
   export default function Checkout() {
-    const { user, isAuthenticated } = useAuth();
-    const { formatCurrency } = useLanguage();
+  const { user, isAuthenticated } = useAuth();
+  const { formatCurrency } = useLanguage();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: loyalty } = useQuery<{ balance: number }>({
+    queryKey: ["/api/loyalty"],
+    enabled: isAuthenticated,
+  });
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
   
   const [step, setStep] = useState<"shipping" | "payment" | "confirmation">("shipping");
   const [paymentMethod, setPaymentMethod] = useState("card");
@@ -79,18 +85,22 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
       const total = calculateTotal();
 
-      // Create order
-        const orderRes = await apiRequest("POST", "/api/orders", {
-          total: total.toString(),
-          shippingAddress,
-          items: orderItems,
-        });
-        const order = await orderRes.json();
+      if (pointsToRedeem > 0) {
+        await apiRequest("POST", "/api/loyalty/redeem", { points: pointsToRedeem });
+      }
 
-        // Process payment
-        await apiRequest("POST", "/api/payments", {
-          orderId: order.id,
-          amount: total.toString(),
+      // Create order
+      const orderRes = await apiRequest("POST", "/api/orders", {
+        total: total.toString(),
+        shippingAddress,
+        items: orderItems,
+      });
+      const order = await orderRes.json();
+
+      // Process payment
+      await apiRequest("POST", "/api/payments", {
+        orderId: order.id,
+        amount: total.toString(),
           method: paymentMethod,
         });
 
@@ -131,8 +141,16 @@ import { useLanguage } from "@/contexts/LanguageContext";
   };
 
   const calculateTotal = () => {
-    return calculateSubtotal() + calculateShipping() + calculateTax();
+    return Math.max(
+      0,
+      calculateSubtotal() + calculateShipping() + calculateTax() - pointsToRedeem,
+    );
   };
+
+  const maxRedeem = Math.min(
+    loyalty?.balance || 0,
+    Math.floor(calculateSubtotal() + calculateShipping() + calculateTax()),
+  );
 
   const handleContinueToPayment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -485,6 +503,29 @@ import { useLanguage } from "@/contexts/LanguageContext";
                     <span>Tax:</span>
                     <span>{formatCurrency(calculateTax())}</span>
                   </div>
+                  {loyalty && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span>Redeem Points ({loyalty.balance}):</span>
+                      <Input
+                        type="number"
+                        className="w-20"
+                        min={0}
+                        max={maxRedeem}
+                        value={pointsToRedeem ? pointsToRedeem : ""}
+                        onChange={(e) =>
+                          setPointsToRedeem(
+                            Math.min(Number(e.target.value), maxRedeem),
+                          )
+                        }
+                      />
+                    </div>
+                  )}
+                  {pointsToRedeem > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Points Redeemed:</span>
+                      <span>-{formatCurrency(pointsToRedeem)}</span>
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-bold">
                     <span>Total:</span>

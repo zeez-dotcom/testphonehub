@@ -17,6 +17,7 @@ import SellerDocuments from "@/pages/seller-documents";
 import AdminPanel from "@/pages/admin-panel";
 import POSSystem from "@/pages/pos-system";
 import Checkout from "@/pages/checkout";
+import Loyalty from "@/pages/loyalty";
 
 function Router() {
   const { isLoading } = useAuth();
@@ -46,6 +47,7 @@ function Router() {
       <ProtectedRoute path="/admin-panel" component={AdminPanel} roles={["admin"]} />
       <ProtectedRoute path="/pos-system" component={POSSystem} roles={["seller", "admin"]} />
       <ProtectedRoute path="/checkout" component={Checkout} roles={["customer", "seller", "admin"]} />
+      <ProtectedRoute path="/loyalty" component={Loyalty} roles={["customer", "admin"]} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />
