@@ -54,6 +54,12 @@ export default function SellerDashboard() {
     ownerPhoto: [] as string[],
   });
 
+  const [notificationSettings, setNotificationSettings] = useState({
+    emailNotifications: true,
+    smsNotifications: true,
+    lowStockAlerts: true,
+  });
+
   // For simplified implementation, the seller is the current user
   const seller = user;
 
@@ -98,6 +104,17 @@ export default function SellerDashboard() {
     queryKey: ["/api/sellers", "notifications"],
     enabled: !!seller?.id,
   });
+
+  const { data: sellerSettings } = useQuery({
+    queryKey: ["/api/sellers", "settings"],
+    enabled: !!seller?.id,
+  });
+
+  useEffect(() => {
+    if (sellerSettings) {
+      setNotificationSettings(sellerSettings);
+    }
+  }, [sellerSettings]);
 
   // Product mutations
   const createProductMutation = useMutation({
@@ -196,6 +213,28 @@ export default function SellerDashboard() {
     } else {
       createProductMutation.mutate(productForm);
     }
+  };
+
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (data: typeof notificationSettings) => {
+      const res = await apiRequest("PUT", "/api/sellers/settings", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sellers", "settings"] });
+      toast({ title: t("operation_successful") });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("operation_failed"),
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleNotification = (key: keyof typeof notificationSettings) => {
+    setNotificationSettings((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleEditProduct = async (product: Product) => {
@@ -1129,30 +1168,51 @@ export default function SellerDashboard() {
                             <Label>{t("email_notifications")}</Label>
                             <p className="text-sm text-muted-foreground">{t("receive_order_email_updates")}</p>
                           </div>
-                          <Button variant="outline" size="sm">
-                            {t("enabled")}
+                          <Button
+                            variant={notificationSettings.emailNotifications ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => toggleNotification("emailNotifications")}
+                          >
+                            {t(notificationSettings.emailNotifications ? "enabled" : "disabled")}
                           </Button>
                         </div>
-                        
+
                         <div className="flex items-center justify-between">
                           <div>
                             <Label>{t("sms_notifications")}</Label>
                             <p className="text-sm text-muted-foreground">{t("receive_order_sms_updates")}</p>
                           </div>
-                          <Button variant="outline" size="sm">
-                            {t("enabled")}
+                          <Button
+                            variant={notificationSettings.smsNotifications ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => toggleNotification("smsNotifications")}
+                          >
+                            {t(notificationSettings.smsNotifications ? "enabled" : "disabled")}
                           </Button>
                         </div>
-                        
+
                         <div className="flex items-center justify-between">
                           <div>
                             <Label>{t("low_stock_alerts")}</Label>
                             <p className="text-sm text-muted-foreground">{t("get_notified_low_stock")}</p>
                           </div>
-                          <Button variant="outline" size="sm">
-                            {t("enabled")}
+                          <Button
+                            variant={notificationSettings.lowStockAlerts ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => toggleNotification("lowStockAlerts")}
+                          >
+                            {t(notificationSettings.lowStockAlerts ? "enabled" : "disabled")}
                           </Button>
                         </div>
+                      </div>
+                      <div className="flex justify-end pt-2">
+                        <Button
+                          size="sm"
+                          onClick={() => saveSettingsMutation.mutate(notificationSettings)}
+                          disabled={saveSettingsMutation.isPending}
+                        >
+                          {t("save_settings")}
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
