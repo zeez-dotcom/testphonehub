@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigation } from "@/components/navigation";
 import {
   Card,
@@ -103,6 +103,9 @@ export default function AdminPanel() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userDetailsOpen, setUserDetailsOpen] = useState(false);
   const [userRoleFilter, setUserRoleFilter] = useState<string>("all");
+  const [settings, setSettings] = useState<AdminSettings>({
+    notification_email: "",
+  });
 
   // Redirect if not admin
   if (user?.role !== "admin") {
@@ -164,6 +167,12 @@ export default function AdminPanel() {
   const { data: adminSettings = {}, isLoading: settingsLoading } = useQuery({
     queryKey: ["/api/admin/settings"],
   });
+
+  useEffect(() => {
+    if (adminSettings) {
+      setSettings(adminSettings as AdminSettings);
+    }
+  }, [adminSettings]);
 
   // Delivery and accounting data
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
@@ -347,6 +356,23 @@ export default function AdminPanel() {
     onError: (error) => {
       toast({
         title: "Failed to update seller details",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (data: AdminSettings) => {
+      return await apiRequest("PUT", "/api/admin/settings", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Settings saved" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to save settings",
         description: error.message,
         variant: "destructive",
       });
@@ -1446,13 +1472,22 @@ export default function AdminPanel() {
                       <Input
                         id="notification-email"
                         type="email"
-                        defaultValue={
-                          (adminSettings as any)?.notification_email || ""
+                        value={settings.notification_email}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            notification_email: e.target.value,
+                          })
                         }
                         className="mt-1"
                       />
                     </div>
-                    <Button>Save Settings</Button>
+                    <Button
+                      onClick={() => updateSettingsMutation.mutate(settings)}
+                      disabled={updateSettingsMutation.isPending}
+                    >
+                      Save Settings
+                    </Button>
                   </>
                 )}
               </CardContent>
