@@ -18,6 +18,7 @@ import AdminPanel from "@/pages/admin-panel";
 import POSSystem from "@/pages/pos-system";
 import Checkout from "@/pages/checkout";
 import Loyalty from "@/pages/loyalty";
+import Home from "@/pages/home";
 
 function Router() {
   const { isLoading } = useAuth();
@@ -33,7 +34,7 @@ function Router() {
   return (
     <Switch>
       {/* Public routes */}
-      <Route path="/" component={Marketplace} />
+      <Route path="/" component={Home} />
       <Route path="/marketplace" component={Marketplace} />
       <Route path="/product/:id" component={ProductDetails} />
       

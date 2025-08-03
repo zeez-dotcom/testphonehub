@@ -25,6 +25,7 @@ import {
 } from "@shared/schema";
 import type { AuthenticatedRequest, AuthenticatedUser } from "./types";
 import { z } from "zod";
+import { getRecommendations } from "./recommendations";
 
 // JWT Authentication middleware
 const jwtSecret = process.env.JWT_SECRET;
@@ -1623,6 +1624,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Update stock error:", error);
       res.status(500).json({ message: "Failed to update stock" });
+    }
+  });
+
+  // ─── RECOMMENDATIONS ─────────────────────────────────────────────────────────
+
+  app.get("/api/recommendations", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
+      const ids = await getRecommendations(req.user!.userId, limit);
+      const products = await Promise.all(ids.map((id) => storage.getProduct(id)));
+      res.json(products.filter(Boolean));
+    } catch (error) {
+      console.error("Get recommendations error:", error);
+      res.status(500).json({ message: "Failed to get recommendations" });
     }
   });
 
