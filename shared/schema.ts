@@ -75,7 +75,9 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   role: userRoleEnum("role").notNull().default("customer"),
   profileImageUrl: varchar("profile_image_url"),
-  
+
+  loyaltyPoints: integer("loyalty_points").notNull().default(0),
+
   // OAuth provider fields
   googleId: varchar("google_id"),
   appleId: varchar("apple_id"),
@@ -203,6 +205,17 @@ export const payments = pgTable("payments", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ─── LOYALTY TRANSACTIONS ───────────────────────────────────────────────────────
+
+export const loyaltyTransactions = pgTable("loyalty_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  points: integer("points").notNull(),
+  type: varchar("type").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ─── NOTIFICATIONS ─────────────────────────────────────────────────────────────
 
 export const notifications = pgTable("notifications", {
@@ -270,12 +283,17 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
   order: one(orders, { fields: [payments.orderId], references: [orders.id] }),
 }));
 
+export const loyaltyTransactionsRelations = relations(loyaltyTransactions, ({ one }) => ({
+  user: one(users, { fields: [loyaltyTransactions.userId], references: [users.id] }),
+}));
+
 // ─── INSERT SCHEMAS ────────────────────────────────────────────────────────────
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  loyaltyPoints: true,
 });
 
 export const insertSellerSchema = createInsertSchema(sellers).omit({
@@ -358,6 +376,11 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   updatedAt: true,
 });
 
+export const insertLoyaltyTransactionSchema = createInsertSchema(loyaltyTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+
 // ─── TYPES ─────────────────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -380,6 +403,9 @@ export type InsertCartItem = z.infer<typeof insertCartSchema>;
 
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+
+export type LoyaltyTransaction = typeof loyaltyTransactions.$inferSelect;
+export type InsertLoyaltyTransaction = z.infer<typeof insertLoyaltyTransactionSchema>;
 
 export type Review = typeof reviews.$inferSelect;
 export const insertReviewSchema = createInsertSchema(reviews).omit({

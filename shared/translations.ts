@@ -130,6 +130,12 @@ export const translations = {
   "shipping_address": "عنوان الشحن",
   "billing_address": "عنوان الفواتير",
 
+  // Loyalty
+  "loyalty_points": "نقاط الولاء",
+  "point_balance": "رصيد النقاط",
+  "redeem_points": "استبدال النقاط",
+  "transaction_history": "سجل النقاط",
+
   // Payment & Receipt
   "payment": "الدفع",
   "payment_method": "طريقة الدفع",
@@ -555,7 +561,13 @@ const englishTranslations: Record<string, string> = {
   "discount": "Discount",
   "total": "Total",
   "grand_total": "Grand Total",
-  
+
+  // Loyalty
+  "loyalty_points": "Loyalty Points",
+  "point_balance": "Point Balance",
+  "redeem_points": "Redeem Points",
+  "transaction_history": "Transaction History",
+
   // Cart & Checkout
   "cart": "Cart",
   "shopping_cart": "Shopping Cart",

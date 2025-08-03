@@ -24,6 +24,7 @@ import {
   insertMessageSchema,
 } from "@shared/schema";
 import type { AuthenticatedRequest, AuthenticatedUser } from "./types";
+import { z } from "zod";
 
 // JWT Authentication middleware
 const jwtSecret = process.env.JWT_SECRET;
@@ -722,12 +723,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update order status if payment successful
       if (status === "completed") {
         await storage.updateOrder(paymentData.orderId, { status: "processing" });
+        await storage.creditLoyaltyPoints(
+          req.user!.userId,
+          Math.floor(parseFloat(paymentData.amount)),
+        );
       }
 
       res.json(payment);
     } catch (error) {
       console.error("Process payment error:", error);
       res.status(400).json({ message: "Payment processing failed" });
+    }
+  });
+
+  // Loyalty endpoints
+  app.get("/api/loyalty", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const balance = await storage.getLoyaltyBalance(req.user!.userId);
+      const transactions = await storage.getLoyaltyTransactions(req.user!.userId);
+      res.json({ balance, transactions });
+    } catch (error) {
+      console.error("Get loyalty error:", error);
+      res.status(500).json({ message: "Failed to fetch loyalty data" });
+    }
+  });
+
+  app.post("/api/loyalty/redeem", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    const redeemSchema = z.object({ points: z.number().int().positive() });
+    try {
+      const { points } = redeemSchema.parse(req.body);
+      await storage.redeemLoyaltyPoints(req.user!.userId, points);
+      const balance = await storage.getLoyaltyBalance(req.user!.userId);
+      res.json({ balance });
+    } catch (error: any) {
+      console.error("Redeem loyalty error:", error);
+      res.status(400).json({ message: error.message || "Failed to redeem points" });
     }
   });
 
