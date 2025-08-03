@@ -221,6 +221,9 @@ export class DatabaseStorage implements IStorage {
           ownerCivilId: sellers.ownerCivilId,
           businessAddress: sellers.businessAddress,
           whatsappNumber: sellers.whatsappNumber,
+          emailNotifications: sellers.emailNotifications,
+          smsNotifications: sellers.smsNotifications,
+          lowStockAlerts: sellers.lowStockAlerts,
           // Document fields
           businessLogo: sellers.businessLogo,
           shopLicenseImage: sellers.shopLicenseImage,

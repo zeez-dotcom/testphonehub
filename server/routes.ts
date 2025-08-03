@@ -899,6 +899,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Seller notification settings
+  app.get("/api/sellers/settings", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+      res.json({
+        emailNotifications: seller.emailNotifications,
+        smsNotifications: seller.smsNotifications,
+        lowStockAlerts: seller.lowStockAlerts,
+      });
+    } catch (error) {
+      console.error("Get seller settings error:", error);
+      res.status(500).json({ message: "Failed to get seller settings" });
+    }
+  });
+
+  app.put("/api/sellers/settings", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+
+      const updated = await storage.updateSeller(seller.sellerId, {
+        emailNotifications: req.body.emailNotifications,
+        smsNotifications: req.body.smsNotifications,
+        lowStockAlerts: req.body.lowStockAlerts,
+      });
+
+      res.json({
+        emailNotifications: updated.emailNotifications,
+        smsNotifications: updated.smsNotifications,
+        lowStockAlerts: updated.lowStockAlerts,
+      });
+    } catch (error) {
+      console.error("Update seller settings error:", error);
+      res.status(500).json({ message: "Failed to update seller settings" });
+    }
+  });
+
   // Admin routes for document management
   app.get("/api/admin/sellers/documents", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {

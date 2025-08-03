@@ -108,6 +108,10 @@ export const sellers = pgTable("sellers", {
   emiratesId: varchar("emirates_id"),
   passportNumber: varchar("passport_number"),
 
+  emailNotifications: boolean("email_notifications").notNull().default(true),
+  smsNotifications: boolean("sms_notifications").notNull().default(true),
+  lowStockAlerts: boolean("low_stock_alerts").notNull().default(true),
+
   // Branding
   businessLogo: varchar("business_logo"),
   businessEmail: varchar("business_email"),
