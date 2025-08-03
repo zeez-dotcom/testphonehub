@@ -899,6 +899,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update seller notification settings
+  app.put("/api/sellers/settings", requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const seller = await storage.getSellerByUserId(req.user!.userId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller profile not found" });
+      }
+
+      const { emailNotifications, smsNotifications, lowStockAlerts } = req.body;
+      const updatedSeller = await storage.updateSeller(seller.sellerId, {
+        emailNotifications,
+        smsNotifications,
+        lowStockAlerts,
+      });
+
+      res.json(updatedSeller);
+    } catch (error) {
+      console.error("Update seller settings error:", error);
+      res.status(500).json({ message: "Failed to update settings" });
+    }
+  });
+
   // Admin routes for document management
   app.get("/api/admin/sellers/documents", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {

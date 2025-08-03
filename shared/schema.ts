@@ -113,6 +113,11 @@ export const sellers = pgTable("sellers", {
   businessEmail: varchar("business_email"),
   businessWebsite: varchar("business_website"),
 
+  // Notification preferences
+  emailNotifications: boolean("email_notifications").notNull().default(true),
+  smsNotifications: boolean("sms_notifications").notNull().default(true),
+  lowStockAlerts: boolean("low_stock_alerts").notNull().default(true),
+
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
