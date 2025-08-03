@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import ChatWidget from "@/components/chat-widget";
+import { useRecommendations } from "@/hooks/useRecommendations";
+import { ProductCard } from "@/components/product-card";
 
 export default function ProductDetails() {
   const [, params] = useRoute("/product/:id");
@@ -55,6 +57,8 @@ export default function ProductDetails() {
       });
     },
   });
+
+  const { data: recommended = [] } = useRecommendations(8);
 
   const handleAddToCart = () => {
     if (!user) {
@@ -231,6 +235,24 @@ export default function ProductDetails() {
             </Button>
           </div>
         </div>
+
+        {recommended.filter((p) => p.id !== productId).length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-4">Recommended for you</h2>
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {recommended
+                .filter((p) => p.id !== productId)
+                .map((p) => (
+                  <div key={p.id} className="w-64 flex-shrink-0">
+                    <ProductCard
+                      product={p}
+                      onClick={() => setLocation(`/product/${p.id}`)}
+                    />
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
 
         {/* Seller Information */}
         {product.seller && (

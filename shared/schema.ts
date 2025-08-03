@@ -64,6 +64,11 @@ export const productStatusEnum = pgEnum("product_status", [
   "approved",
   "rejected",
 ]);
+export const userEventTypeEnum = pgEnum("user_event_type", [
+  "view",
+  "cart_add",
+  "purchase",
+]);
 
 // ─── USERS ──────────────────────────────────────────────────────────────────────
 
@@ -230,6 +235,16 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ─── USER EVENTS ────────────────────────────────────────────────────────────────
+
+export const userEvents = pgTable("user_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  eventType: userEventTypeEnum("event_type").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ─── ADMIN SETTINGS ────────────────────────────────────────────────────────────
 
 export const adminSettings = pgTable("admin_settings", {
@@ -281,6 +296,11 @@ export const cartRelations = relations(cart, ({ one }) => ({
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
   order: one(orders, { fields: [payments.orderId], references: [orders.id] }),
+}));
+
+export const userEventsRelations = relations(userEvents, ({ one }) => ({
+  user: one(users, { fields: [userEvents.userId], references: [users.id] }),
+  product: one(products, { fields: [userEvents.productId], references: [products.id] }),
 }));
 
 export const loyaltyTransactionsRelations = relations(loyaltyTransactions, ({ one }) => ({
@@ -376,6 +396,11 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   updatedAt: true,
 });
 
+export const insertUserEventSchema = createInsertSchema(userEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertLoyaltyTransactionSchema = createInsertSchema(loyaltyTransactions).omit({
   id: true,
   createdAt: true,
@@ -403,6 +428,9 @@ export type InsertCartItem = z.infer<typeof insertCartSchema>;
 
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+
+export type UserEvent = typeof userEvents.$inferSelect;
+export type InsertUserEvent = z.infer<typeof insertUserEventSchema>;
 
 export type LoyaltyTransaction = typeof loyaltyTransactions.$inferSelect;
 export type InsertLoyaltyTransaction = z.infer<typeof insertLoyaltyTransactionSchema>;
