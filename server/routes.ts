@@ -21,6 +21,7 @@ import {
   insertCartSchema,
   insertPaymentSchema,
   insertReviewSchema,
+  insertMessageSchema,
 } from "@shared/schema";
 import type { AuthenticatedRequest, AuthenticatedUser } from "./types";
 
@@ -1027,6 +1028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Combine seller information
       const sellerDetails = {
         id: seller.id,
+        userId: seller.userId,
         businessName: seller.businessName,
         location: seller.location,
         phoneNumber: seller.phoneNumber,
@@ -1591,6 +1593,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Update stock error:", error);
       res.status(500).json({ message: "Failed to update stock" });
+    }
+  });
+
+  // ─── CHAT ROUTES ───────────────────────────
+
+  app.get("/api/chat/history/:userId", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const messages = await storage.getMessageHistory(req.user!.userId, req.params.userId);
+      res.json(messages);
+    } catch (error) {
+      console.error("Get chat history error:", error);
+      res.status(500).json({ message: "Failed to get chat history" });
+    }
+  });
+
+  app.post("/api/chat", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const messageData = insertMessageSchema.parse({
+        senderId: req.user!.userId,
+        receiverId: req.body.receiverId,
+        productId: req.body.productId,
+        content: req.body.content,
+      });
+      const message = await storage.createMessage(messageData);
+      const io = req.app.get("io");
+      if (io) {
+        io.to(message.receiverId).emit("message", message);
+        io.to(message.senderId).emit("message", message);
+      }
+      res.status(201).json(message);
+    } catch (error) {
+      console.error("Send chat message error:", error);
+      res.status(500).json({ message: "Failed to send message" });
     }
   });
 

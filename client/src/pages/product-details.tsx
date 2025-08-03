@@ -10,6 +10,7 @@ import { ShoppingCart, Star, MapPin, Phone, Mail, Calendar, Package, ArrowLeft }
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
+import ChatWidget from "@/components/chat-widget";
 
 export default function ProductDetails() {
   const [, params] = useRoute("/product/:id");
@@ -233,49 +234,54 @@ export default function ProductDetails() {
 
         {/* Seller Information */}
         {product.seller && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Sold by</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <h3 className="text-xl font-semibold">{product.seller.businessName}</h3>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      <span>{product.seller.rating}</span>
-                      <span>({product.seller.reviewCount} reviews)</span>
+          <>
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Sold by</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold">{product.seller.businessName}</h3>
+                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                        <span>{product.seller.rating}</span>
+                        <span>({product.seller.reviewCount} reviews)</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        <span>Joined {new Date(product.seller.joinedDate).toLocaleDateString()}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>Joined {new Date(product.seller.joinedDate).toLocaleDateString()}</span>
+                    <div className="flex items-center gap-4 text-sm">
+                      {product.seller.location && (
+                        <div className="flex items-center gap-1">
+                          <MapPin className="w-4 h-4" />
+                          <span>{product.seller.location}</span>
+                        </div>
+                      )}
+                      {product.seller.phoneNumber && (
+                        <div className="flex items-center gap-1">
+                          <Phone className="w-4 h-4" />
+                          <span>{product.seller.phoneNumber}</span>
+                        </div>
+                      )}
+                      {product.seller.email && (
+                        <div className="flex items-center gap-1">
+                          <Mail className="w-4 h-4" />
+                          <span>{product.seller.email}</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    {product.seller.location && (
-                      <div className="flex items-center gap-1">
-                        <MapPin className="w-4 h-4" />
-                        <span>{product.seller.location}</span>
-                      </div>
-                    )}
-                    {product.seller.phoneNumber && (
-                      <div className="flex items-center gap-1">
-                        <Phone className="w-4 h-4" />
-                        <span>{product.seller.phoneNumber}</span>
-                      </div>
-                    )}
-                    {product.seller.email && (
-                      <div className="flex items-center gap-1">
-                        <Mail className="w-4 h-4" />
-                        <span>{product.seller.email}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+            <div className="mb-8">
+              <ChatWidget receiverId={product.seller.userId} productId={productId!} />
+            </div>
+          </>
         )}
 
         {/* Product Reviews */}

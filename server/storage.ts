@@ -10,6 +10,7 @@ import {
   adminSettings,
   reviews,
   inventoryLogs,
+  messages,
   type User,
   type InsertUser,
   type Seller,
@@ -28,9 +29,11 @@ import {
   type InsertReview,
   type InventoryLog,
   type InsertInventoryLog,
+  type Message,
+  type InsertMessage,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, like, or, sql } from "drizzle-orm";
+import { eq, desc, and, like, or, sql, asc } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 export interface IStorage {
@@ -147,6 +150,10 @@ export interface IStorage {
   logInventoryChange(log: InsertInventoryLog): Promise<InventoryLog>;
   getProductInventoryLogs(productId: string): Promise<InventoryLog[]>;
   updateProductStock(productId: string, quantityChange: number, reason: string, orderId?: string): Promise<void>;
+
+  // Chat operations
+  getMessageHistory(userId: string, otherUserId: string): Promise<Message[]>;
+  createMessage(message: InsertMessage): Promise<Message>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -968,6 +975,25 @@ export class DatabaseStorage implements IStorage {
       reason,
       orderId
     });
+  }
+
+  // Chat operations
+  async getMessageHistory(userId: string, otherUserId: string): Promise<Message[]> {
+    return await db
+      .select()
+      .from(messages)
+      .where(
+        or(
+          and(eq(messages.senderId, userId), eq(messages.receiverId, otherUserId)),
+          and(eq(messages.senderId, otherUserId), eq(messages.receiverId, userId))
+        )
+      )
+      .orderBy(asc(messages.createdAt));
+  }
+
+  async createMessage(message: InsertMessage): Promise<Message> {
+    const [result] = await db.insert(messages).values(message).returning();
+    return result;
   }
 }
 

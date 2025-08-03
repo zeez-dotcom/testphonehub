@@ -1,6 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { Server as SocketIOServer } from "socket.io";
+import jwt from "jsonwebtoken";
+import type { AuthenticatedUser } from "./types";
+
+const JWT_SECRET = process.env.JWT_SECRET || "";
 
 const app = express();
 app.use(express.json());
@@ -38,6 +43,24 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
+
+  const io = new SocketIOServer(server, { cors: { origin: "*" } });
+  app.set("io", io);
+
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error("Unauthorized"));
+    jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
+      if (err) return next(new Error("Unauthorized"));
+      socket.data.user = decoded as AuthenticatedUser;
+      next();
+    });
+  });
+
+  io.on("connection", (socket) => {
+    const user = socket.data.user as AuthenticatedUser;
+    socket.join(user.userId);
+  });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
