@@ -7,10 +7,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Package, ShoppingBag, Heart, User } from "lucide-react";
 import type { Order } from "@shared/schema";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useLocation } from "wouter";
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
   const { formatCurrency } = useLanguage();
+  const [, setLocation] = useLocation();
 
   const { data: orders = [] } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
@@ -137,15 +139,27 @@ export default function CustomerDashboard() {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button className="w-full" variant="outline">
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => setLocation("/orders")}
+                >
                   <Package className="h-4 w-4 mr-2" />
                   Track Order
                 </Button>
-                <Button className="w-full" variant="outline">
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => setLocation("/wishlist")}
+                >
                   <Heart className="h-4 w-4 mr-2" />
                   View Wishlist
                 </Button>
-                <Button className="w-full" variant="outline">
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => setLocation("/profile")}
+                >
                   <User className="h-4 w-4 mr-2" />
                   Update Profile
                 </Button>
