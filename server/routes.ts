@@ -1245,12 +1245,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/admin/settings", requireRole("admin"), async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (req.body.notification_email) {
-        await storage.setAdminSetting(
-          "notification_email", 
-          req.body.notification_email,
-          "Email address for admin notifications"
-        );
+      const settings = req.body as Record<string, unknown>;
+      for (const [key, value] of Object.entries(settings)) {
+        if (typeof value === "string") {
+          await storage.setAdminSetting(key, value, `Admin setting ${key}`);
+        }
       }
       res.json({ success: true });
     } catch (error) {
