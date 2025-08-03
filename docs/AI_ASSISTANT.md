@@ -11,3 +11,7 @@
 - Notification toggle buttons: let sellers enable or disable email, SMS, and low-stock alerts. These preferences can be saved, but actual notification delivery is still a placeholder.
 - **Save Settings** button: persists the selected notification preferences to the backend.
 
+## Customer Dashboard
+
+- Quick action buttons ("Track Order," "View Wishlist," and "Update Profile") currently navigate to placeholder routes and do not yet provide full functionality.
+
