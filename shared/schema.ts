@@ -315,6 +315,18 @@ export const inventoryLogs = pgTable("inventory_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ─── MESSAGES ───────────────────────────────────────
+
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  senderId: varchar("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  receiverId: varchar("receiver_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  productId: varchar("product_id").references(() => products.id, { onDelete: "set null" }),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const insertProductSchema = createInsertSchema(products).omit({
   id: true,
   createdAt: true,
@@ -383,3 +395,11 @@ export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).omit({
   createdAt: true,
 });
 export type InsertInventoryLog = z.infer<typeof insertInventoryLogSchema>;
+
+export type Message = typeof messages.$inferSelect;
+export const insertMessageSchema = createInsertSchema(messages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertMessage = z.infer<typeof insertMessageSchema>;

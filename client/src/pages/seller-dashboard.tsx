@@ -18,6 +18,7 @@ import { Package, Clock, Star, Plus, Edit, Trash2, BarChart3, Bell, CheckCircle,
 import { useLanguage } from "@/contexts/LanguageContext";
 import { FileUpload } from "@/components/file-upload";
 import type { Product, Order, Seller } from "@shared/schema";
+import ChatWidget from "@/components/chat-widget";
 
 export default function SellerDashboard() {
   const { user } = useAuth();
@@ -1256,6 +1257,7 @@ export default function SellerDashboard() {
           </CardContent>
         </Card>
       </div>
+      <ChatWidget />
     </div>
   );
 }
