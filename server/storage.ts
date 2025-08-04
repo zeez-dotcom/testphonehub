@@ -147,6 +147,41 @@ export interface IStorage {
     pendingApprovals: number;
   }>;
 
+  getOrderReports(params: {
+    granularity: "daily" | "weekly" | "monthly" | "yearly";
+    startDate?: Date;
+    endDate?: Date;
+    sellerId?: string;
+    productId?: string;
+  }): Promise<
+    Array<{
+      period: string;
+      revenue: string;
+      orders: number;
+      itemsSold: number;
+      stockDelta: number;
+    }>
+  >;
+
+  getTopProducts(params: {
+    granularity: "daily" | "weekly" | "monthly" | "yearly";
+    startDate?: Date;
+    endDate?: Date;
+    sellerId?: string;
+    productId?: string;
+    limit?: number;
+  }): Promise<
+    Array<{
+      productId: string;
+      name: string;
+      imageUrl: string | null;
+      price: string;
+      quantitySold: number;
+      revenue: string;
+      stockDelta: number;
+    }>
+  >;
+
   // Reviews operations
   createReview(review: InsertReview): Promise<Review>;
   getProductReviews(productId: string): Promise<Review[]>;
@@ -858,6 +893,147 @@ export class DatabaseStorage implements IStorage {
       totalOrders: ordersResult.totalOrders || 0,
       pendingApprovals: approvalsResult.pendingApprovals || 0,
     };
+  }
+
+  async getOrderReports(params: {
+    granularity: "daily" | "weekly" | "monthly" | "yearly";
+    startDate?: Date;
+    endDate?: Date;
+    sellerId?: string;
+    productId?: string;
+  }): Promise<
+    Array<{
+      period: string;
+      revenue: string;
+      orders: number;
+      itemsSold: number;
+      stockDelta: number;
+    }>
+  > {
+    const { granularity, sellerId, productId } = params;
+    const end = params.endDate ?? new Date();
+    const start = params.startDate ?? (() => {
+      const d = new Date(end);
+      switch (granularity) {
+        case "daily":
+          d.setDate(d.getDate() - 1);
+          break;
+        case "weekly":
+          d.setDate(d.getDate() - 7);
+          break;
+        case "monthly":
+          d.setMonth(d.getMonth() - 1);
+          break;
+        case "yearly":
+          d.setFullYear(d.getFullYear() - 1);
+          break;
+      }
+      return d;
+    })();
+
+    const conditions = [sql`o.created_at >= ${start}`, sql`o.created_at <= ${end}`];
+    if (sellerId) conditions.push(sql`o.seller_id = ${sellerId}`);
+    if (productId)
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM jsonb_array_elements(o.items) item WHERE item->>'productId' = ${productId})`
+      );
+    const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
+
+    const query = sql`
+      SELECT
+        period,
+        COUNT(*) AS orders,
+        SUM(total) AS revenue,
+        SUM(items_sold) AS items_sold,
+        SUM(stock_delta) AS stock_delta
+      FROM (
+        SELECT
+          date_trunc(${granularity}, o.created_at) AS period,
+          o.id,
+          o.total::numeric AS total,
+          (SELECT COALESCE(SUM((item->>'quantity')::int),0)
+             FROM jsonb_array_elements(o.items) item) AS items_sold,
+          COALESCE(SUM(il.quantity_change),0) AS stock_delta
+        FROM orders o
+        LEFT JOIN inventory_logs il ON il.order_id = o.id
+        ${whereClause}
+        GROUP BY o.id, date_trunc(${granularity}, o.created_at)
+      ) s
+      GROUP BY period
+      ORDER BY period;
+    `;
+
+    const result = await db.execute(query);
+    // @ts-ignore drizzle types
+    return result.rows as any[];
+  }
+
+  async getTopProducts(params: {
+    granularity: "daily" | "weekly" | "monthly" | "yearly";
+    startDate?: Date;
+    endDate?: Date;
+    sellerId?: string;
+    productId?: string;
+    limit?: number;
+  }): Promise<
+    Array<{
+      productId: string;
+      name: string;
+      imageUrl: string | null;
+      price: string;
+      quantitySold: number;
+      revenue: string;
+      stockDelta: number;
+    }>
+  > {
+    const { granularity, sellerId, productId, limit = 10 } = params;
+    const end = params.endDate ?? new Date();
+    const start = params.startDate ?? (() => {
+      const d = new Date(end);
+      switch (granularity) {
+        case "daily":
+          d.setDate(d.getDate() - 1);
+          break;
+        case "weekly":
+          d.setDate(d.getDate() - 7);
+          break;
+        case "monthly":
+          d.setMonth(d.getMonth() - 1);
+          break;
+        case "yearly":
+          d.setFullYear(d.getFullYear() - 1);
+          break;
+      }
+      return d;
+    })();
+
+    const conditions = [sql`o.created_at >= ${start}`, sql`o.created_at <= ${end}`];
+    if (sellerId) conditions.push(sql`o.seller_id = ${sellerId}`);
+    if (productId) conditions.push(sql`p.id = ${productId}`);
+    const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
+
+    const query = sql`
+      SELECT
+        p.id AS product_id,
+        p.name,
+        p.image_url,
+        p.price,
+        SUM((item->>'quantity')::int) AS quantity_sold,
+        SUM((item->>'quantity')::int * (item->>'price')::numeric) AS revenue,
+        COALESCE(SUM(il.quantity_change),0) AS stock_delta
+      FROM orders o
+      CROSS JOIN LATERAL jsonb_array_elements(o.items) AS item
+      JOIN products p ON p.id = item->>'productId'
+      LEFT JOIN inventory_logs il ON il.order_id = o.id AND il.product_id = p.id
+      ${whereClause}
+      GROUP BY p.id
+      ORDER BY quantity_sold DESC
+      LIMIT ${limit};
+    `;
+
+    const result = await db.execute(query);
+    // @ts-ignore drizzle types
+    return result.rows as any[];
   }
 
   // Notification operations
