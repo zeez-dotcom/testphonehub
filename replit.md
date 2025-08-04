@@ -79,6 +79,7 @@ Logging in with this default account automatically sets up the admin role.
 Before running the server, set the required environment variables:
 
 - `JWT_SECRET`: Secret key for signing JSON Web Tokens. The server will fail to start if this variable is not provided.
+- `DATABASE_URL`: Connection string for the PostgreSQL database. Defaults to `postgresql://postgres:postgres@localhost:5432/postgres` if omitted.
 - `REDIS_URL`: Connection string for the Redis instance used to persist sessions.
 - `REDIS_USERNAME`: Username for authenticating with Redis (if required).
 - `REDIS_PASSWORD`: Password for authenticating with Redis.
