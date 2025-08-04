@@ -1539,6 +1539,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get(
+    "/api/analytics/orders",
+    requireRole("admin"),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { granularity = "daily", startDate, endDate, sellerId, productId } =
+          req.query as any;
+        const reports = await storage.getOrderReports({
+          granularity: granularity as any,
+          startDate: startDate ? new Date(startDate) : undefined,
+          endDate: endDate ? new Date(endDate) : undefined,
+          sellerId: sellerId as string | undefined,
+          productId: productId as string | undefined,
+        });
+        res.json(reports);
+      } catch (error) {
+        console.error("Get order reports error:", error);
+        res.status(500).json({ message: "Failed to get order reports" });
+      }
+    }
+  );
+
+  app.get(
+    "/api/analytics/top-products",
+    requireRole("admin"),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { granularity = "monthly", startDate, endDate, sellerId, productId, limit } =
+          req.query as any;
+        const products = await storage.getTopProducts({
+          granularity: granularity as any,
+          startDate: startDate ? new Date(startDate) : undefined,
+          endDate: endDate ? new Date(endDate) : undefined,
+          sellerId: sellerId as string | undefined,
+          productId: productId as string | undefined,
+          limit: limit ? parseInt(limit, 10) : undefined,
+        });
+        res.json(products);
+      } catch (error) {
+        console.error("Get top products error:", error);
+        res.status(500).json({ message: "Failed to get top products" });
+      }
+    }
+  );
+
   // ─── REVIEWS ROUTES ──────────────────────────────────────────────────────────
 
   // Get product reviews
