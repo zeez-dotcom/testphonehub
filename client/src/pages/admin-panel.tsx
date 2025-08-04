@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Navigation } from "@/components/navigation";
 import {
   Card,
@@ -49,6 +49,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 
 interface Notification {
   id: string;
@@ -106,6 +120,16 @@ export default function AdminPanel() {
   const [settings, setSettings] = useState<AdminSettings>({
     notification_email: "",
   });
+  const [reportFilters, setReportFilters] = useState({
+    startDate: "",
+    endDate: "",
+    productId: "",
+    category: "",
+  });
+
+  const handleReportFilterChange = (key: string, value: string) => {
+    setReportFilters((prev) => ({ ...prev, [key]: value }));
+  };
 
   // Redirect if not admin
   if (user?.role !== "admin") {
@@ -182,6 +206,105 @@ export default function AdminPanel() {
   const { data: payments = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ["/api/admin/payments"],
   });
+
+  const { data: allProducts = [] } = useQuery<Product[]>({
+    queryKey: ["/api/products"],
+  });
+
+  const { data: orderReports = [], isLoading: orderReportsLoading } = useQuery({
+    queryKey: ["/api/analytics/orders", reportFilters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (reportFilters.startDate)
+        params.set("startDate", reportFilters.startDate);
+      if (reportFilters.endDate) params.set("endDate", reportFilters.endDate);
+      if (reportFilters.productId)
+        params.set("productId", reportFilters.productId);
+      if (reportFilters.category)
+        params.set("category", reportFilters.category);
+      const res = await apiRequest(
+        "GET",
+        `/api/analytics/orders?${params.toString()}`,
+      );
+      return res.json();
+    },
+  });
+
+  const { data: topProductsReport = [], isLoading: topProductsLoading } =
+    useQuery({
+      queryKey: ["/api/analytics/top-products", reportFilters],
+      queryFn: async () => {
+        const params = new URLSearchParams();
+        if (reportFilters.startDate)
+          params.set("startDate", reportFilters.startDate);
+        if (reportFilters.endDate) params.set("endDate", reportFilters.endDate);
+        if (reportFilters.category)
+          params.set("category", reportFilters.category);
+        if (reportFilters.productId)
+          params.set("productId", reportFilters.productId);
+        const res = await apiRequest(
+          "GET",
+          `/api/analytics/top-products?${params.toString()}`,
+        );
+        return res.json();
+      },
+    });
+
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set((allProducts as Product[]).map((p: Product) => p.category)),
+      ),
+    [allProducts],
+  );
+
+  const handleExportRevenue = async () => {
+    const params = new URLSearchParams();
+    if (reportFilters.startDate)
+      params.set("startDate", reportFilters.startDate);
+    if (reportFilters.endDate) params.set("endDate", reportFilters.endDate);
+    if (reportFilters.productId)
+      params.set("productId", reportFilters.productId);
+    if (reportFilters.category)
+      params.set("category", reportFilters.category);
+    const res = await apiRequest(
+      "GET",
+      `/api/analytics/orders/export?${params.toString()}`,
+    );
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "orders-report.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleExportProducts = async () => {
+    const params = new URLSearchParams();
+    if (reportFilters.startDate)
+      params.set("startDate", reportFilters.startDate);
+    if (reportFilters.endDate) params.set("endDate", reportFilters.endDate);
+    if (reportFilters.category)
+      params.set("category", reportFilters.category);
+    if (reportFilters.productId)
+      params.set("productId", reportFilters.productId);
+    const res = await apiRequest(
+      "GET",
+      `/api/analytics/top-products/export?${params.toString()}`,
+    );
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "top-products-report.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
 
   // Mutations
   const approveSellerMutation = useMutation({
@@ -479,7 +602,7 @@ export default function AdminPanel() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
@@ -487,6 +610,7 @@ export default function AdminPanel() {
             <TabsTrigger value="seller-documents">Documents</TabsTrigger>
             <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
             <TabsTrigger value="accounting">Accounting</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
@@ -1442,6 +1566,172 @@ export default function AdminPanel() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Reports Tab */}
+          <TabsContent value="reports" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Reports</CardTitle>
+                <CardDescription>
+                  Analytics over selected period
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div>
+                    <Label htmlFor="start-date">Start Date</Label>
+                    <Input
+                      id="start-date"
+                      type="date"
+                      value={reportFilters.startDate}
+                      onChange={(e) =>
+                        handleReportFilterChange("startDate", e.target.value)
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="end-date">End Date</Label>
+                    <Input
+                      id="end-date"
+                      type="date"
+                      value={reportFilters.endDate}
+                      onChange={(e) =>
+                        handleReportFilterChange("endDate", e.target.value)
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label>Product</Label>
+                    <Select
+                      value={reportFilters.productId}
+                      onValueChange={(v) =>
+                        handleReportFilterChange("productId", v)
+                      }
+                    >
+                      <SelectTrigger className="w-[200px] mt-1">
+                        <SelectValue placeholder="All Products" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All Products</SelectItem>
+                        {(allProducts as Product[]).map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Category</Label>
+                    <Select
+                      value={reportFilters.category}
+                      onValueChange={(v) =>
+                        handleReportFilterChange("category", v)
+                      }
+                    >
+                      <SelectTrigger className="w-[200px] mt-1">
+                        <SelectValue placeholder="All Categories" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All Categories</SelectItem>
+                        {categories.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleExportRevenue}
+                    className="mt-6"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Export Orders
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleExportProducts}
+                    className="mt-6"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Export Products
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Revenue Trends</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {orderReportsLoading ? (
+                    <div className="h-[300px] flex items-center justify-center">
+                      Loading...
+                    </div>
+                  ) : (
+                    <ChartContainer
+                      config={{
+                        revenue: {
+                          label: "Revenue",
+                          color: "hsl(var(--chart-1))",
+                        },
+                      }}
+                    >
+                      <LineChart data={orderReports}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="period" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Line
+                          type="monotone"
+                          dataKey="revenue"
+                          stroke="var(--color-revenue)"
+                          strokeWidth={2}
+                        />
+                      </LineChart>
+                    </ChartContainer>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Products</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {topProductsLoading ? (
+                    <div className="h-[300px] flex items-center justify-center">
+                      Loading...
+                    </div>
+                  ) : (
+                    <ChartContainer
+                      config={{
+                        revenue: {
+                          label: "Revenue",
+                          color: "hsl(var(--chart-2))",
+                        },
+                      }}
+                    >
+                      <BarChart data={topProductsReport}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar
+                          dataKey="revenue"
+                          fill="var(--color-revenue)"
+                        />
+                      </BarChart>
+                    </ChartContainer>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Settings Tab */}
